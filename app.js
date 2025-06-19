@@ -28,6 +28,9 @@ app.use("/api/faqs", require("./routes/faqRoutes"));
 app.use("/api/tour-categories", require("./routes/tourCategoryRoutes"));
 app.use("/api/tour-tour-categories", require("./routes/tourTourCategoryRoutes"));
 app.use("/api/itinerary-locations", require("./routes/itineraryLocationRoutes"));
+app.use("/api/departure-dates", require("./routes/departureDateRoutes"));
+app.use("/api/hotels", require("./routes/hotelRoutes"));
+app.use("/api/tour-hotels", require("./routes/tourHotelRoutes"));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

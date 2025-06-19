@@ -6,6 +6,18 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'itinerary_location',
     timestamps: false
   });
+  ItineraryLocation.associate = (models) => {
+  ItineraryLocation.belongsTo(models.Itinerary, {
+    foreignKey: "itinerary_id",
+    as: "itinerary"
+  });
+
+  ItineraryLocation.belongsTo(models.Location, {
+    foreignKey: "location_id",
+    as: "location"
+  });
+};
+
 
   return ItineraryLocation;
 };

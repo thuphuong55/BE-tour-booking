@@ -36,5 +36,9 @@ db.ItineraryLocation = require('./itineraryLocation')(sequelize, DataTypes);
 db.TourIncludedService = require('./tourIncludedService')(sequelize, DataTypes);
 db.ExcludedService = require('./excludedService')(sequelize, DataTypes);
 db.TourExcludedService = require('./tourExcludedService')(sequelize, DataTypes);
+db.DepartureDate = require('./departureDate')(sequelize, DataTypes);
+db.Hotel = require('./hotel')(sequelize, DataTypes);
+db.TourHotel = require('./tour_hotel')(sequelize, DataTypes);
+
 
 module.exports = db;

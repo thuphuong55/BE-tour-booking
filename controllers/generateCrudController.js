@@ -1,4 +1,6 @@
 function generateCrudController(model) {
+  const primaryKeyField = model.primaryKeyAttributes[0]; // Lấy tên cột primary key từ model
+
   return {
     async getAll(req, res) {
       try {
@@ -11,8 +13,8 @@ function generateCrudController(model) {
 
     async getById(req, res) {
       try {
-        const item = await model.findByPk(req.params.id);
-        if (!item) return res.status(404).json({ message: "Not found" });
+        const item = await model.findOne({ where: { [primaryKeyField]: req.params.id } });
+        if (!item) return res.status(404).json({ message: "Không tìm thấy!" });
         res.json(item);
       } catch (error) {
         res.status(500).json({ error: error.message });
@@ -30,8 +32,8 @@ function generateCrudController(model) {
 
     async update(req, res) {
       try {
-        const item = await model.findByPk(req.params.id);
-        if (!item) return res.status(404).json({ message: "Not found" });
+        const item = await model.findOne({ where: { [primaryKeyField]: req.params.id } });
+        if (!item) return res.status(404).json({ message: "Không tìm thấy!" });
         await item.update(req.body);
         res.json(item);
       } catch (error) {
@@ -41,10 +43,10 @@ function generateCrudController(model) {
 
     async delete(req, res) {
       try {
-        const item = await model.findByPk(req.params.id);
-        if (!item) return res.status(404).json({ message: "Not found" });
+        const item = await model.findOne({ where: { [primaryKeyField]: req.params.id } });
+        if (!item) return res.status(404).json({ message: "Không tìm thấy!" });
         await item.destroy();
-        res.json({ message: "Deleted successfully" });
+        res.json({ message: "Xoá thành công!" });
       } catch (error) {
         res.status(500).json({ error: error.message });
       }

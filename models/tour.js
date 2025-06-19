@@ -19,6 +19,21 @@ module.exports = (sequelize, DataTypes) => {
     createdAt: 'created_at',
     updatedAt: 'updated_at'
   });
+  Tour.associate = (models) => {
+    Tour.hasMany(models.DepartureDate, {
+      foreignKey: "tour_id",
+      as: "departureDates",
+    });
+
+    Tour.belongsToMany(models.Hotel, {
+      through: "tour_hotel",
+      foreignKey: "tour_id",
+      otherKey: "id_hotel",
+      as: "hotels",
+    });
+  };
+
+
 
   return Tour;
 };
