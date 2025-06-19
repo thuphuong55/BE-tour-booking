@@ -104,6 +104,11 @@ Location.belongsToMany(Itinerary, {
   foreignKey: 'location_id',
   otherKey: 'itinerary_id'
 });
+//tour - departureDate
+// Tour - DepartureDate
+Tour.hasMany(DepartureDate, { foreignKey: 'tour_id', as: 'departureDates' });
+DepartureDate.belongsTo(Tour, { foreignKey: 'tour_id', as: 'tour' });
+
 
 // Export
 db.sequelize = sequelize;

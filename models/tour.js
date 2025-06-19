@@ -9,10 +9,11 @@ module.exports = (sequelize, DataTypes) => {
     duration_days: { type: DataTypes.INTEGER, allowNull: false },
     duration_nights: { type: DataTypes.INTEGER, defaultValue: 0 },
     departure_location: { type: DataTypes.STRING },
-    tour_type: { type: DataTypes.ENUM('Domestic', 'International'), defaultValue: 'Domestic' },
+    price: { type: DataTypes.FLOAT, allowNull: true }, 
+    tour_type: { type: DataTypes.ENUM('Trong nước', 'Quốc tế'), defaultValue: 'Trong nước' },
     max_participants: { type: DataTypes.INTEGER, allowNull: false },
     min_participants: { type: DataTypes.INTEGER, defaultValue: 1 },
-    status: { type: DataTypes.ENUM('draft', 'active', 'inactive', 'cancelled'), defaultValue: 'draft' }
+    status: { type: DataTypes.ENUM('Chờ duyệt', 'Đang hoạt động', 'Ngừng hoạt động', 'Đã hủy'), defaultValue: 'Chờ duyệt' }
   }, {
     tableName: 'tour',
     timestamps: true,

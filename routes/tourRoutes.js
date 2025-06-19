@@ -8,4 +8,7 @@ router.post("/", tourController.create);
 router.put("/:id", tourController.update);
 router.delete("/:id", tourController.delete);
 
+// Route thêm: lấy 1 tour kèm các ngày khởi hành
+router.get("/:id/departures", tourController.getTourWithDepartures);
+
 module.exports = router;
