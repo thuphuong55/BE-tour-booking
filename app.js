@@ -31,6 +31,8 @@ app.use("/api/itinerary-locations", require("./routes/itineraryLocationRoutes"))
 app.use("/api/departure-dates", require("./routes/departureDateRoutes"));
 app.use("/api/hotels", require("./routes/hotelRoutes"));
 app.use("/api/tour-hotels", require("./routes/tourHotelRoutes"));
+app.use("/api/tour-images", require("./routes/tourImageRoutes"));
+app.use("/api/provinces", require ("./routes/provinceRoutes"));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

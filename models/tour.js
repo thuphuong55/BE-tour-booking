@@ -6,8 +6,7 @@ module.exports = (sequelize, DataTypes) => {
     description: { type: DataTypes.TEXT },
     location: { type: DataTypes.STRING },
     destination: { type: DataTypes.STRING },
-    duration_days: { type: DataTypes.INTEGER, allowNull: false },
-    duration_nights: { type: DataTypes.INTEGER, defaultValue: 0 },
+
     departure_location: { type: DataTypes.STRING },
     price: { type: DataTypes.FLOAT, allowNull: true }, 
     tour_type: { type: DataTypes.ENUM('Trong nước', 'Quốc tế'), defaultValue: 'Trong nước' },

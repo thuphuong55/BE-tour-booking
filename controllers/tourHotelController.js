@@ -1,9 +1,9 @@
-const { tour_hotel, Tour, Hotel } = require("../models");
+const { TourHotel, Tour, Hotel } = require("../models");
 
 module.exports = {
   async getAll(req, res) {
     try {
-      const data = await tour_hotel.findAll({
+      const data = await TourHotel.findAll({
         include: [
           { model: Tour, as: "tour" },
           { model: Hotel, as: "hotel" },
@@ -18,7 +18,7 @@ module.exports = {
 
   async getById(req, res) {
     try {
-      const item = await tour_hotel.findByPk(req.params.id, {
+      const item = await TourHotel.findByPk(req.params.id, {
         include: [
           { model: Tour, as: "tour" },
           { model: Hotel, as: "hotel" },
@@ -34,7 +34,7 @@ module.exports = {
 
   async create(req, res) {
     try {
-      const newItem = await tour_hotel.create(req.body);
+      const newItem = await TourHotel.create(req.body);
       res.status(201).json(newItem);
     } catch (error) {
       console.error("Lỗi create tour_hotel:", error);
