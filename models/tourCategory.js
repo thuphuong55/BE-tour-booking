@@ -7,5 +7,15 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: false
   });
 
+  TourCategory.associate = (models) => {
+    // ✅ Quan hệ nhiều-nhiều với Tour
+    TourCategory.belongsToMany(models.Tour, {
+      through: models.TourTourCategory,
+      foreignKey: 'category_id',
+      otherKey: 'tour_id',
+      as: 'tours'
+    });
+  };
+
   return TourCategory;
 };

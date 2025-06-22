@@ -6,9 +6,8 @@ module.exports = (sequelize, DataTypes) => {
     description: { type: DataTypes.TEXT },
     location: { type: DataTypes.STRING },
     destination: { type: DataTypes.STRING },
-
     departure_location: { type: DataTypes.STRING },
-    price: { type: DataTypes.FLOAT, allowNull: true }, 
+    price: { type: DataTypes.FLOAT, allowNull: true },
     tour_type: { type: DataTypes.ENUM('Trong nước', 'Quốc tế'), defaultValue: 'Trong nước' },
     max_participants: { type: DataTypes.INTEGER, allowNull: false },
     min_participants: { type: DataTypes.INTEGER, defaultValue: 1 },
@@ -19,6 +18,7 @@ module.exports = (sequelize, DataTypes) => {
     createdAt: 'created_at',
     updatedAt: 'updated_at'
   });
+
   Tour.associate = (models) => {
     Tour.hasMany(models.DepartureDate, {
       foreignKey: "tour_id",
@@ -31,9 +31,22 @@ module.exports = (sequelize, DataTypes) => {
       otherKey: "id_hotel",
       as: "hotels",
     });
+
+    Tour.belongsToMany(models.TourCategory, {
+      through: models.TourTourCategory,
+      foreignKey: 'tour_id',
+      otherKey: 'category_id',
+      as: 'categories'
+    });
+
+    // ✅ Quan hệ nhiều-nhiều với IncludedService
+    Tour.belongsToMany(models.IncludedService, {
+      through: models.TourIncludedService,
+      foreignKey: 'tour_id',
+      otherKey: 'included_service_id',
+      as: 'includedServices'
+    });
   };
-
-
 
   return Tour;
 };

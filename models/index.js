@@ -40,11 +40,15 @@ db.TourExcludedService = require('./tourExcludedService')(sequelize, DataTypes);
 db.DepartureDate = require('./departureDate')(sequelize, DataTypes);
 db.Hotel = require('./hotel')(sequelize, DataTypes);
 db.TourHotel = require('./tour_hotel')(sequelize, DataTypes);
+db.IncludedService = require('./includedService')(sequelize, DataTypes);
 Object.keys(db).forEach(modelName => {
   if (db[modelName].associate) {
     db[modelName].associate(db);
   }
 });
+
+
+
 
 
 

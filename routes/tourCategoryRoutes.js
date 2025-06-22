@@ -1,11 +1,23 @@
 const express = require("express");
 const router = express.Router();
-const tourCategoryController = require("../controllers/tourCategoryController");
+const controller = require("../controllers/tourCategoryController");
 
-router.get("/", tourCategoryController.getAll);
-router.get("/:id", tourCategoryController.getById);
-router.post("/", tourCategoryController.create);
-router.put("/:id", tourCategoryController.update);
-router.delete("/:id", tourCategoryController.delete);
+// Lấy tất cả danh mục
+router.get("/", controller.getAll);
+
+// Lấy 1 danh mục
+router.get("/:id", controller.getById);
+
+// Lấy 1 danh mục kèm danh sách tour liên quan
+router.get("/:id/tours", controller.getCategoryWithTours);
+
+// Thêm danh mục
+router.post("/", controller.create);
+
+// Cập nhật danh mục
+router.put("/:id", controller.update);
+
+// Xoá danh mục
+router.delete("/:id", controller.delete);
 
 module.exports = router;

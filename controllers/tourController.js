@@ -128,11 +128,80 @@ const getTourWithDepartures = async (req, res) => {
   }
 };
 
+// Lấy tour + danh mục (categories)
+const getTourWithCategories = async (req, res) => {
+  try {
+    const tour = await Tour.findByPk(req.params.id, {
+      include: [
+        {
+          model: require("../models").TourCategory,
+          as: "categories"
+        }
+      ]
+    });
+
+    if (!tour) {
+      return res.status(404).json({ message: "Không tìm thấy tour!" });
+    }
+
+    res.json(tour);
+  } catch (err) {
+    console.error("Lỗi khi lấy tour + categories:", err);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+// Lấy tour + các dịch vụ bao gồm
+const getTourWithIncludedServices = async (req, res) => {
+  try {
+    const tour = await Tour.findByPk(req.params.id, {
+      include: [
+        {
+          model: require("../models").IncludedService,
+          as: "includedServices"
+        }
+      ]
+    });
+
+    if (!tour) {
+      return res.status(404).json({ message: "Không tìm thấy tour!" });
+    }
+
+    res.json(tour);
+  } catch (err) {
+    console.error("Lỗi khi lấy tour + included services:", err);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+const assignIncludedServiceToTour = async (req, res) => {
+  const { tourId, serviceId } = req.params;
+  try {
+    const { Tour, IncludedService } = require("../models");
+
+    const tour = await Tour.findByPk(tourId);
+    const service = await IncludedService.findByPk(serviceId);
+
+    if (!tour || !service) {
+      return res.status(404).json({ message: "Không tìm thấy tour hoặc dịch vụ" });
+    }
+
+    await tour.addIncludedService(service); // Sequelize magic method
+
+    res.json({ message: "Đã gắn dịch vụ vào tour thành công" });
+  } catch (err) {
+    console.error("Lỗi khi gắn dịch vụ vào tour:", err);
+    res.status(500).json({ message: "Lỗi server", error: err.message });
+  }
+};
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
   delete: remove,
-  getTourWithDepartures
+  getTourWithDepartures,
+  getTourWithCategories,
+  getTourWithIncludedServices,
+  assignIncludedServiceToTour
 };
