@@ -34,6 +34,10 @@ app.use("/api/tour-hotels", require("./routes/tourHotelRoutes"));
 app.use("/api/tour-images", require("./routes/tourImageRoutes"));
 app.use("/api/provinces", require ("./routes/provinceRoutes"));
 app.use("/api/included-services", require("./routes/includedServiceRoutes"));
+app.use("/api/tour-images", require("./routes/tourImageRoutes"));
+app.use("/api/information-booking", require("./routes/informationBookingRoutes"));
+app.use("/api/destinations", require("./routes/destinationRoutes"));
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

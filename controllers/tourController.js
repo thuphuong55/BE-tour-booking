@@ -1,6 +1,6 @@
-const { Tour, DepartureDate } = require("../models");
+const { Tour, DepartureDate, TourImage, IncludedService, TourCategory } = require("../models");
 
-// Lấy tất cả tour kèm các ngày khởi hành
+// Lấy tất cả tour kèm các ngày khởi hành và ảnh
 const getAll = async (req, res) => {
   try {
     const tours = await Tour.findAll({
@@ -15,6 +15,11 @@ const getAll = async (req, res) => {
             'number_of_days',
             'number_of_nights'
           ]
+        },
+        {
+          model: TourImage,
+          as: 'images',
+          attributes: ['id', 'image_url', 'is_main']
         }
       ]
     });
@@ -25,7 +30,7 @@ const getAll = async (req, res) => {
   }
 };
 
-// Lấy 1 tour theo ID
+// Lấy 1 tour theo ID kèm ảnh và ngày khởi hành
 const getById = async (req, res) => {
   try {
     const tour = await Tour.findByPk(req.params.id, {
@@ -40,6 +45,11 @@ const getById = async (req, res) => {
             'number_of_days',
             'number_of_nights'
           ]
+        },
+        {
+          model: TourImage,
+          as: 'images',
+          attributes: ['id', 'image_url', 'is_main']
         }
       ]
     });
@@ -134,7 +144,7 @@ const getTourWithCategories = async (req, res) => {
     const tour = await Tour.findByPk(req.params.id, {
       include: [
         {
-          model: require("../models").TourCategory,
+          model: TourCategory,
           as: "categories"
         }
       ]
@@ -157,7 +167,7 @@ const getTourWithIncludedServices = async (req, res) => {
     const tour = await Tour.findByPk(req.params.id, {
       include: [
         {
-          model: require("../models").IncludedService,
+          model: IncludedService,
           as: "includedServices"
         }
       ]
@@ -173,11 +183,11 @@ const getTourWithIncludedServices = async (req, res) => {
     res.status(500).json({ message: "Lỗi server" });
   }
 };
+
+// Gán dịch vụ cho tour
 const assignIncludedServiceToTour = async (req, res) => {
   const { tourId, serviceId } = req.params;
   try {
-    const { Tour, IncludedService } = require("../models");
-
     const tour = await Tour.findByPk(tourId);
     const service = await IncludedService.findByPk(serviceId);
 
@@ -185,8 +195,7 @@ const assignIncludedServiceToTour = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tour hoặc dịch vụ" });
     }
 
-    await tour.addIncludedService(service); // Sequelize magic method
-
+    await tour.addIncludedService(service);
     res.json({ message: "Đã gắn dịch vụ vào tour thành công" });
   } catch (err) {
     console.error("Lỗi khi gắn dịch vụ vào tour:", err);

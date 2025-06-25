@@ -11,5 +11,12 @@ module.exports = (sequelize, DataTypes) => {
     updatedAt: 'updated_at'
   });
 
+  TourImage.associate = (models) => {
+  TourImage.belongsTo(models.Tour, {
+    foreignKey: 'tour_id',
+    as: 'tour'
+  });
+};
+
   return TourImage;
 };

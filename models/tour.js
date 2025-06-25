@@ -46,6 +46,12 @@ module.exports = (sequelize, DataTypes) => {
       otherKey: 'included_service_id',
       as: 'includedServices'
     });
+
+    Tour.hasMany(models.TourImage, {
+      foreignKey: 'tour_id',
+      as: 'images'
+    });
+
   };
 
   return Tour;
