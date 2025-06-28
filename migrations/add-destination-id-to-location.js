@@ -5,7 +5,7 @@ module.exports = {
   up: async (queryInterface, Sequelize) => {
     await queryInterface.addColumn("location", "destination_id", {
       type: Sequelize.UUID,
-      allowNull: true,          // ← nếu bảng location đang có data cũ, tạm đặt true
+      allowNull: true,          
       references: {
         model: "destination",
         key: "id",

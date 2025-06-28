@@ -31,6 +31,7 @@ db.FAQ = require('./faq')(sequelize, DataTypes);
 db.Promotion = require('./promotion')(sequelize, DataTypes);
 db.TourCategory = require('./tourCategory')(sequelize, DataTypes);
 db.TourTourCategory = require('./tourTourCategory')(sequelize, DataTypes);
+db.Destination = require("./destination")(sequelize, DataTypes);
 db.Location = require('./location')(sequelize, DataTypes);
 db.Itinerary = require('./itinerary')(sequelize, DataTypes);
 db.ItineraryLocation = require('./itineraryLocation')(sequelize, DataTypes);
@@ -42,7 +43,7 @@ db.Hotel = require('./hotel')(sequelize, DataTypes);
 db.TourHotel = require('./tour_hotel')(sequelize, DataTypes);
 db.IncludedService = require('./includedService')(sequelize, DataTypes);
 db.InformationBookingTour = require('./informationBookingTour')(sequelize, DataTypes);
-db.Destination = require("./destination")(sequelize, DataTypes);
+
 
 
 Object.keys(db).forEach(modelName => {

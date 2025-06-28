@@ -27,13 +27,6 @@ exports.register = async (req, res) => {
       role
     });
 
-    const token = generateToken({
-      id: newUser.id,
-      email: newUser.email,
-      role: newUser.role
-    });
-
-    console.log("✅ User created:", newUser.id);
 
     return res.status(201).json({
       message: "User registered successfully",
@@ -43,7 +36,6 @@ exports.register = async (req, res) => {
         email: newUser.email,
         role: newUser.role
       },
-      token
     });
   } catch (err) {
     return res.status(500).json({ message: "Internal server error" });
@@ -75,7 +67,6 @@ exports.login = async (req, res) => {
       role: user.role
     });
 
-    console.log("✅ Login successful for:", user.id);
 
     return res.json({
       message: "Login successful",

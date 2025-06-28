@@ -1,49 +1,48 @@
-module.exports = function generateCrudController(Model, include = []) {
+module.exports = (Model, include = []) => {
+  // Chuẩn hoá: nếu dev truyền { include: [...] } thì rút gọn về [...]
+  const defaultInclude = Array.isArray(include) ? include : include.include || [];
+
   return {
-    // Lấy toàn bộ dữ liệu
-    getAll: async (req, res) => {
+    async getAll(req, res) {
       try {
-        const data = await Model.findAll({ include });
-        res.json(data);
+        const rows = await Model.findAll({ include: defaultInclude });
+        res.json(rows);
       } catch (err) {
-        console.error("Lỗi getAll:", err);
-        res.status(500).json({ message: "Lỗi server", error: err.message });
+        console.error(err);
+        res.status(500).json({ error: err.message });
       }
     },
 
-    // Lấy 1 bản ghi theo ID
-    getById: async (req, res) => {
+    async getById(req, res) {
       try {
-        const item = await Model.findByPk(req.params.id, { include });
-        if (!item) return res.status(404).json({ message: "Không tìm thấy" });
-        res.json(item);
+        const row = await Model.findByPk(req.params.id, { include: defaultInclude });
+        if (!row) return res.status(404).json({ error: "Not found" });
+        res.json(row);
       } catch (err) {
-        console.error("Lỗi getById:", err);
-        res.status(500).json({ message: "Lỗi server", error: err.message });
+        console.error(err);
+        res.status(500).json({ error: err.message });
       }
     },
 
-    // Tạo mới (mặc định — có thể override ở controller cụ thể)
-    create: async (req, res) => {
+    async create(req, res) {
       try {
-        const item = await Model.create(req.body);
-        res.status(201).json(item);
+        const row = await Model.create(req.body);
+        res.status(201).json(row);
       } catch (err) {
-        console.error("Lỗi create:", err);
-        res.status(400).json({ message: "Tạo thất bại", error: err.message });
+        console.error(err);
+        res.status(500).json({ error: err.message });
       }
     },
 
-    // Cập nhật
-    update: async (req, res) => {
+    async update(req, res) {
       try {
-        const item = await Model.findByPk(req.params.id);
-        if (!item) return res.status(404).json({ message: "Không tìm thấy" });
-        await item.update(req.body);
-        res.json(item);
+        const [count] = await Model.update(req.body, { where: { id: req.params.id } });
+        if (!count) return res.status(404).json({ error: "Not found" });
+        const row = await Model.findByPk(req.params.id, { include: defaultInclude });
+        res.json(row);
       } catch (err) {
-        console.error("Lỗi update:", err);
-        res.status(400).json({ message: "Cập nhật thất bại", error: err.message });
+        console.error(err);
+        res.status(500).json({ error: err.message });
       }
     },
 

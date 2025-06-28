@@ -1,11 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const agencyController = require("../controllers/agencyController");
+const { protect } = require("../middlewares/authMiddleware");
 
-router.get("/", agencyController.getAll);
-router.get("/:id", agencyController.getById);
-router.post("/", agencyController.create);
-router.put("/:id", agencyController.update);
-router.delete("/:id", agencyController.delete);
-
+router.post("/request-agency", protect(["user"]), agencyController.requestAgency);
+router.put("/:id/approve", protect(["admin"]), agencyController.approvedAgency);
+router.get("/", protect(["admin"]), agencyController.getAllAgencies);
 module.exports = router;
