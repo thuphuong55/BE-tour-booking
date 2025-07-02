@@ -37,6 +37,7 @@ app.use("/api/included-services", require("./routes/includedServiceRoutes"));
 app.use("/api/tour-images", require("./routes/tourImageRoutes"));
 app.use("/api/information-booking", require("./routes/informationBookingRoutes"));
 app.use("/api/destinations", require("./routes/destinationRoutes"));
+app.use("/api/auth", require ("./routes/authRoutes"));
 
 
 const PORT = process.env.PORT || 5000;

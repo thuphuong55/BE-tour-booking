@@ -22,11 +22,24 @@ module.exports = (sequelize, DataTypes) => {
     role: {
       type: DataTypes.STRING,
       allowNull: false
+    },
+    status: {
+      type: DataTypes.ENUM('active', 'inactive'),
+      allowNull: false,
+      defaultValue: 'inactive'
+    },
+    temp_password_token: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: true // tên người/công ty đăng ký
     }
   }, {
-          timestamps: true, // ⚠️ Bật timestamps
-          createdAt: 'created_at',
-          updatedAt: 'updated_at',
+    timestamps: true, // ⚠️ Bật timestamps
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     tableName: 'users'
   });
 
