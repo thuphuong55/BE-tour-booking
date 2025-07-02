@@ -8,7 +8,9 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'tour_image',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    underscored: true,
+    indexes:    [{ fields: ['tour_id'] }], //truy van nhanh
   });
 
   TourImage.associate = (models) => {

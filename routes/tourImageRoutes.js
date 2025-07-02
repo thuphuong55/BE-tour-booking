@@ -1,11 +1,14 @@
 const express = require("express");
 const router = express.Router();
-const controller = require("../controllers/tourImageController");
+const ctrl = require("../controllers/tourImageController");
 
-// Route đúng:
-router.get("/tour/:tourId", controller.getByTour);   
-router.post("/", controller.create);
-router.put("/:id", controller.update);
-router.delete("/:id", controller.delete);
+// lấy album ảnh (đa tour, có phân trang)
+router.get("/", ctrl.getAll);
+
+router.get("/tour/:tourId", ctrl.getByTour);
+
+router.post("/", ctrl.create);
+router.put("/:id", ctrl.update);
+router.delete("/:id", ctrl.delete);
 
 module.exports = router;
