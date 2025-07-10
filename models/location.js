@@ -14,11 +14,7 @@ module.exports = (sequelize, DataTypes) => {
       image_url: {
         type: DataTypes.STRING,
         allowNull: true,
-      },
-      destination_id: {
-        type: DataTypes.UUID,
-        allowNull: true,
-      },
+      }
     },
     {
       tableName: "location",
@@ -26,11 +22,10 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-
   Location.associate = (models) => {
-    Location.belongsTo(models.Destination, {
-      foreignKey: "destination_id",
-      as: "destination",
+    Location.hasMany(models.Destination, {
+      foreignKey: "location_id",
+      as: "destinations"
     });
   };
 

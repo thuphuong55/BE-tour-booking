@@ -7,8 +7,7 @@ module.exports = (sequelize, DataTypes) => {
     total_price: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
     booking_date: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
     status: { type: DataTypes.ENUM('pending', 'confirmed', 'cancelled'), defaultValue: 'pending' },
-    number_of_adults: { type: DataTypes.INTEGER, defaultValue: 1 },
-    number_of_children: { type: DataTypes.INTEGER, defaultValue: 0 }
+  
   }, {
     tableName: 'booking',
     timestamps: true,
@@ -33,6 +32,10 @@ module.exports = (sequelize, DataTypes) => {
     Booking.hasMany(models.InformationBookingTour, {
       foreignKey: 'booking_id',
       as: 'guests'
+    });
+     Booking.hasOne(models.Payment, {
+      foreignKey: 'booking_id',
+      as: 'payment'
     });
 
 };

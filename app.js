@@ -17,7 +17,6 @@ app.use("/api/tours", require("./routes/tourRoutes"));
 app.use("/api/tour-schedules", require("./routes/tourScheduleRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
-app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/locations", require("./routes/locationRoutes"));
 app.use("/api/itineraries", require("./routes/itineraryRoutes"));
 app.use("/api/tour-included-services", require("./routes/tourIncludedServiceRoutes"));
@@ -38,7 +37,10 @@ app.use("/api/tour-images", require("./routes/tourImageRoutes"));
 app.use("/api/information-booking", require("./routes/informationBookingRoutes"));
 app.use("/api/destinations", require("./routes/destinationRoutes"));
 app.use("/api/auth", require ("./routes/authRoutes"));
+app.use("/api/momo", require("./routes/momoRoutes"));
+app.use("/api/payments", require("./routes/paymentRoutes"));
 
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+module.exports = app;

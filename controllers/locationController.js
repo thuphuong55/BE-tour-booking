@@ -4,7 +4,7 @@ const generateCrudController = require("./generateCrudController");
 module.exports = generateCrudController(Location, [
   {
     model: Destination,
-    as: "destination",        
+    as: "destinations",
     attributes: ["id", "name"],
   },
 ]);

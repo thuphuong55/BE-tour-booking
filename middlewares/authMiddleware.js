@@ -7,7 +7,7 @@ exports.protect = (allowedRoles = []) => {
     try {
       const authHeader = req.headers.authorization;
 
-        if (!authHeader.startsWith("Bearer ")) {
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({
           success: false,
           code: 401,
@@ -17,6 +17,12 @@ exports.protect = (allowedRoles = []) => {
       }
 
       const token = authHeader.split(" ")[1];
+      // Kiểm tra biến môi trường JWT_SECRET
+      if (!process.env.JWT_SECRET) {
+        return res.status(500).json({
+          message: "Lỗi cấu hình server: JWT_SECRET chưa được thiết lập trong .env"
+        });
+      }
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = decoded;
 
@@ -31,4 +37,8 @@ exports.protect = (allowedRoles = []) => {
     }
   };
 };
+
+// Hướng dẫn:
+// - Đảm bảo file .env có dòng JWT_SECRET=your_jwt_secret
+// - Sau khi chỉnh .env, phải khởi động lại server để biến môi trường được load
 

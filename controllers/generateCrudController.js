@@ -36,7 +36,17 @@ module.exports = (Model, include = []) => {
 
     async update(req, res) {
       try {
-        const [count] = await Model.update(req.body, { where: { id: req.params.id } });
+        // Lọc ra các trường hợp lệ của model
+        const modelAttributes = Object.keys(Model.rawAttributes);
+        const validData = {};
+        
+        for (const key in req.body) {
+          if (modelAttributes.includes(key)) {
+            validData[key] = req.body[key];
+          }
+        }
+        
+        const [count] = await Model.update(validData, { where: { id: req.params.id } });
         if (!count) return res.status(404).json({ error: "Not found" });
         const row = await Model.findByPk(req.params.id, { include: defaultInclude });
         res.json(row);
