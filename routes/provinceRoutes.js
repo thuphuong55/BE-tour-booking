@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const controller = require("../controllers/provinceController");
+const provinceController = require("../controllers/provinceController");
 
-router.get("/search", controller.searchProvinces);
+router.get("/search-tours", provinceController.searchAvailableTours);
 
 module.exports = router;

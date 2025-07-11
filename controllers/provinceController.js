@@ -1,16 +1,53 @@
+const { Location, Destination } = require("../models");
 const provinces = require("../data/provinces.json");
+const { Op, fn, col, where } = require("sequelize");
 
-exports.searchProvinces = (req, res) => {
+exports.searchAvailableTours = async (req, res) => {
   const { keyword = "", region } = req.query;
-  const kw = keyword.toLowerCase();
+  const kw = keyword.toLowerCase(); // chuyển về thường để so sánh
 
-  const filtered = provinces.filter(p => {
-    const matchName = p.name.toLowerCase().includes(kw);
-    const matchUnsigned = p.name_unsigned.toLowerCase().includes(kw);
-    const matchRegion = region ? p.region.toLowerCase() === region.toLowerCase() : true;
+  // B1: Lọc tên tỉnh theo miền từ provinces.json
+  let provinceNames = [];
+  if (region) {
+    provinceNames = provinces
+      .filter(p => p.region.toLowerCase() === region.toLowerCase())
+      .map(p => p.name);
+  }
 
-    return (matchName || matchUnsigned) && matchRegion;
-  });
+  try {
+    const locations = await Location.findAll({
+      where: {
+        [Op.and]: [
+          // Nếu có lọc theo miền
+          region ? { name: { [Op.in]: provinceNames } } : {},
 
-  res.json(filtered);
+          // So sánh không phân biệt hoa thường
+          where(fn('LOWER', col('Location.name')), {
+            [Op.like]: `%${kw}%`
+          })
+        ]
+      },
+      include: [
+        {
+          model: Destination,
+          as: "destinations",
+          required: true // chỉ lấy những tỉnh có destination
+        }
+      ]
+    });
+
+    if (locations.length === 0) {
+      return res.status(404).json({ message: "Không có sẵn tour" });
+    }
+
+    const result = locations.map(loc => ({
+      location: loc.name,
+      destinations: loc.destinations.map(dest => dest.name)
+    }));
+
+    return res.json(result);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
 };

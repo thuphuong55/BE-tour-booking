@@ -8,8 +8,11 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type: DataTypes.STRING,
       allowNull: false
-    }
-  }, {
+    },
+    location_id: {
+      type: DataTypes.UUID,}
+  },
+  {
     tableName: "destination",
     timestamps: false
   });
