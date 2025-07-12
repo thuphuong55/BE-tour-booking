@@ -1,7 +1,6 @@
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
-// protect.js
 exports.protect = (allowedRoles = []) => {
   return (req, res, next) => {
     try {
@@ -28,17 +27,14 @@ exports.protect = (allowedRoles = []) => {
 
       // Nếu yêu cầu role và user không thuộc role
       if (allowedRoles.length > 0 && !allowedRoles.includes(decoded.role)) {
-        return res.status(403).json({ message: "Forbidden: You don't have permission" });
+        return res.status(403).json({ message: "Forbidden: Bạn không có quyền truy cập" });
       }
 
       next();
     } catch (err) {
-      return res.status(401).json({ message: "Unauthorized: Invalid token" });
+      return res.status(401).json({ message: "Unauthorized: Token không hợp lệ" });
     }
   };
 };
 
-// Hướng dẫn:
-// - Đảm bảo file .env có dòng JWT_SECRET=your_jwt_secret
-// - Sau khi chỉnh .env, phải khởi động lại server để biến môi trường được load
 
