@@ -1,6 +1,8 @@
 require('dotenv').config();
 const app = require('./app');
-const detectPort = require('detect-port').default; // 💥 fix lỗi ở đây
+const detectPort = require('detect-port').default; 
+const cron = require("node-cron");
+const expireBookingsJob = require("./jobs/expireBookings");
 
 const DEFAULT_PORT = process.env.PORT || 5000;
 
@@ -18,3 +20,11 @@ detectPort(DEFAULT_PORT).then(port => {
 }).catch(err => {
   console.error('Lỗi kiểm tra port:', err);
 });
+
+
+// Chạy mỗi phút
+cron.schedule("* * * * *", async () => {
+  console.log("[Cron] Đang kiểm tra booking hết hạn...");
+  await expireBookingsJob();
+});
+

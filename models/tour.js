@@ -39,7 +39,6 @@ module.exports = (sequelize, DataTypes) => {
       as: 'categories'
     });
 
-    // ✅ Quan hệ nhiều-nhiều với IncludedService
     Tour.belongsToMany(models.IncludedService, {
       through: models.TourIncludedService,
       foreignKey: 'tour_id',
@@ -52,7 +51,15 @@ module.exports = (sequelize, DataTypes) => {
       as: 'images'
     });
 
-  };
+     Tour.hasMany(models.Review, {
+    foreignKey: 'tour_id',
+    as: 'reviews'
+  });
 
-  return Tour;
+  Tour.belongsTo(models.Agency, {
+    foreignKey: 'agency_id',
+    as: 'agency'
+  });
+ };
+return Tour;
 };
