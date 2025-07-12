@@ -117,7 +117,7 @@ exports.getAgencies = async (req, res) => {
       offset: (page - 1) * limit,
       limit,
       include: [{ model: User, as: "user", attributes: ["id","name","email","status"] }],
-      order: [["createdAt", "DESC"]]
+      order: [["created_at", "DESC"]]
     });
 
     res.json({
@@ -154,7 +154,3 @@ exports.getAgency = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-<<<<<<< HEAD
-
-=======
->>>>>>> UpdateRieng

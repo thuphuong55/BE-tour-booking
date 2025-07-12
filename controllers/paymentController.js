@@ -1,3 +1,30 @@
+// Lấy payment theo id
+exports.getById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const payment = await Payment.findByPk(id, { include: ['booking'] });
+    if (!payment) return res.status(404).json({ message: 'Không tìm thấy payment với id này' });
+    res.json(payment);
+  } catch (error) {
+    console.error('Error getById:', error);
+    res.status(500).json({ message: 'Lỗi lấy thông tin payment theo id' });
+  }
+};
+// Lấy thông tin payment và booking theo orderId (MoMo)
+exports.getByOrderId = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const payment = await Payment.findOne({
+      where: { order_id: orderId },
+      include: [{ model: Booking, as: 'booking' }]
+    });
+    if (!payment) return res.status(404).json({ message: 'Không tìm thấy payment với orderId này' });
+    res.json(payment);
+  } catch (error) {
+    console.error('Error getByOrderId:', error);
+    res.status(500).json({ message: 'Lỗi lấy thông tin payment theo orderId' });
+  }
+};
 const { Payment, Booking } = require('../models');
 
 //Dùng khi tạo thanh toán từ bookingController

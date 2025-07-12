@@ -1,6 +1,21 @@
+// Endpoint xác nhận thanh toán MoMo cho FE
+exports.getTourConfirmation = async (req, res) => {
+  try {
+    const tourId = req.params.id;
+    // Lấy các query param cần thiết
+    const { resultCode, orderId } = req.query;
+    // FE URL, có thể dùng ngrok hoặc localhost tuỳ môi trường
+    // Redirect về FE (Next.js) để FE render trang xác nhận
+    const feUrl = `http://localhost:3000/tour/${tourId}/confirmation?resultCode=${resultCode || ''}&orderId=${orderId || ''}`;
+    return res.redirect(feUrl);
+  } catch (error) {
+    console.error('Error getTourConfirmation:', error);
+    res.status(500).send('Lỗi xác nhận thanh toán');
+  }
+};
 const { createMomoPayment } = require('../services/momoService');
 const paymentController = require('./paymentController'); // để cập nhật trạng thái đơn hàng
-const { Tour , Payment} = require('../models');
+const { Tour, Payment } = require('../models');
 
 
 exports.createPayment = async (req, res) => {
@@ -15,10 +30,11 @@ exports.createPayment = async (req, res) => {
       return res.status(400).json({ message: 'Giá tour không hợp lệ để thanh toán MoMo' });
     }
 
-    const momoRes = await createMomoPayment(
-      `Thanh toán tour ${tour.title}`,
-      amount
-    );
+
+    // Sử dụng FE Next.js port 3000 cho redirectUrl
+    const redirectUrl = `http://localhost:3000/tour/${tour.id}/confirmation`;
+    const orderInfo = `Thanh toán tour ${tour.name}`;
+    const momoRes = await createMomoPayment(orderInfo, amount, redirectUrl);
 
     res.json(momoRes);
   } catch (error) {
@@ -46,10 +62,10 @@ exports.handleIpnCallback = async (req, res) => {
 };
 
 exports.handleRedirectCallback = (req, res) => {
-    const { resultCode } = req.query;
-    if (resultCode == 0) {
-        res.send('Thanh toán thành công!');
-    } else {
-        res.send('Thanh toán thất bại!');
-    }
+  const { resultCode } = req.query;
+  if (resultCode == 0) {
+    res.redirect(`https://bf10103aeae3.ngrok-free.app/tour/${tourId}/confirmation?orderId=${req.query.orderId}`);
+  } else {
+    res.redirect(`https://bf10103aeae3.ngrok-free.app/tour/${tourId}/confirmation?orderId=${req.query.orderId}`);
+  }
 };

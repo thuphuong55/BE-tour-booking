@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 const { momo } = require("../config/env");
 const { buildSignature } = require("../utils/momoSign");
 
-async function createMomoPayment(orderInfo, amount) {
+async function createMomoPayment(orderInfo, amount, redirectUrl) {
     const orderId = momo.partnerCode + new Date().getTime();
     const requestId = orderId;
     const extraData = '';
@@ -16,7 +16,7 @@ async function createMomoPayment(orderInfo, amount) {
         orderId,
         orderInfo,
         partnerCode: momo.partnerCode,
-        redirectUrl: momo.redirectUrl,
+        redirectUrl,
         requestId,
         requestType: momo.requestType,
     }, momo.secretKey);
@@ -29,7 +29,7 @@ async function createMomoPayment(orderInfo, amount) {
         amount,
         orderId,
         orderInfo,
-        redirectUrl: momo.redirectUrl,
+        redirectUrl,
         ipnUrl: momo.ipnUrl,
         lang: momo.lang,
         requestType: momo.requestType,

@@ -14,7 +14,6 @@ app.use("/api/agencies", require("./routes/agencyRoutes"));
 app.use("/api/auth", require("./routes/authRoutes"));  
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/tours", require("./routes/tourRoutes"));
-app.use("/api/tour-schedules", require("./routes/tourScheduleRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/locations", require("./routes/locationRoutes"));
@@ -37,10 +36,7 @@ app.use("/api/tour-images", require("./routes/tourImageRoutes"));
 app.use("/api/information-booking", require("./routes/informationBookingRoutes"));
 app.use("/api/destinations", require("./routes/destinationRoutes"));
 app.use("/api/auth", require ("./routes/authRoutes"));
-<<<<<<< HEAD
 app.use("/api/momo", require("./routes/momoRoutes"));
-=======
->>>>>>> UpdateRieng
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 

@@ -1,10 +1,13 @@
+
+
 const express = require("express");
-const router = express.Router();
 const paymentController = require("../controllers/paymentController");
 const momoController = require("../controllers/momoController");
 const vnpayController = require("../controllers/vnpayController");
+const router = express.Router();
+router.get('/by-order/:orderId', paymentController.getByOrderId);
 
-
+router.get('/:id', paymentController.getById);
 router.get("/", paymentController.getAll);
 router.get("/by-booking/:bookingId", paymentController.getByBookingId);
 
