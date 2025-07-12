@@ -39,6 +39,7 @@ app.use("/api/auth", require ("./routes/authRoutes"));
 app.use("/api/momo", require("./routes/momoRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
+app.use('/api/search', require('./routes/searchRoutes'));
 
 
 const PORT = process.env.PORT || 5000;

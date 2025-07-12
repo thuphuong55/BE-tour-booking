@@ -62,10 +62,11 @@ exports.handleIpnCallback = async (req, res) => {
 };
 
 exports.handleRedirectCallback = (req, res) => {
-  const { resultCode } = req.query;
-  if (resultCode == 0) {
-    res.redirect(`https://bf10103aeae3.ngrok-free.app/tour/${tourId}/confirmation?orderId=${req.query.orderId}`);
-  } else {
-    res.redirect(`https://bf10103aeae3.ngrok-free.app/tour/${tourId}/confirmation?orderId=${req.query.orderId}`);
-  }
+    const { resultCode } = req.query;
+   if (resultCode == 0) {
+  res.redirect(`http://localhost:3000/tour/${tourId}/confirmation?orderId=${req.query.orderId}`);
+} else {
+  res.redirect(`http://localhost:3000/tour/${tourId}/confirmation?orderId=${req.query.orderId}`);
+}
+
 };
