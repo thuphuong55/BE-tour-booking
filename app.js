@@ -37,7 +37,10 @@ app.use("/api/tour-images", require("./routes/tourImageRoutes"));
 app.use("/api/information-booking", require("./routes/informationBookingRoutes"));
 app.use("/api/destinations", require("./routes/destinationRoutes"));
 app.use("/api/auth", require ("./routes/authRoutes"));
+<<<<<<< HEAD
 app.use("/api/momo", require("./routes/momoRoutes"));
+=======
+>>>>>>> UpdateRieng
 app.use("/api/payments", require("./routes/paymentRoutes"));
 
 

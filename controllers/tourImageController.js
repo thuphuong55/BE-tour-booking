@@ -46,7 +46,7 @@ const getAll = async (req, res) => {
 
     const { rows: images, count } = await TourImage.findAndCountAll({
       where,
-      include: [{ model: Tour, attributes: ["id", "name"] }],
+      include: [{ model: Tour, as: "tour", attributes: ["id", "name"] }],
       order: [["created_at", "DESC"]],
       ...paging,
     });
@@ -63,6 +63,12 @@ const create = async (req, res) => {
   try {
     const { tour_id, image_url, is_main } = req.body;
     const mainFlag = is_main === true || is_main === "true";
+
+    // Kiểm tra tour_id có tồn tại không
+    const tour = await Tour.findByPk(tour_id);
+    if (!tour) {
+      return res.status(400).json({ message: "Tour không tồn tại. Vui lòng kiểm tra lại tour_id!" });
+    }
 
     if (mainFlag) {
       await TourImage.update({ is_main: false }, { where: { tour_id } });
