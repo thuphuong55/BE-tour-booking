@@ -47,9 +47,10 @@ exports.handleIpnCallback = async (req, res) => {
 
 exports.handleRedirectCallback = (req, res) => {
     const { resultCode } = req.query;
-    if (resultCode == 0) {
-        res.send('Thanh toán thành công!');
-    } else {
-        res.send('Thanh toán thất bại!');
-    }
+   if (resultCode == 0) {
+  res.redirect(`http://localhost:3000/tour/${tourId}/confirmation?orderId=${req.query.orderId}`);
+} else {
+  res.redirect(`http://localhost:3000/tour/${tourId}/confirmation?orderId=${req.query.orderId}`);
+}
+
 };

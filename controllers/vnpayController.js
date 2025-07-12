@@ -65,6 +65,9 @@ exports.createPayment = async (req, res) => {
       .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
       .join('&');
 
+          console.log("SIGN DATA:\n", signData);
+    console.log("SIGNED (local):\n", signed);
+    console.log("SECURE HASH (from VNPay):\n", secureHash);
   // Ghi lại payment (pending)
   await paymentController.createPayment({
     bookingId,

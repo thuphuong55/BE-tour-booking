@@ -10,7 +10,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     location_id: {
-      type: DataTypes.UUID,}
+      type: DataTypes.UUID,
+    },
+    image: {
+      type: DataTypes.STRING,
+      allowNull: true
+    }
   },
   {
     tableName: "destination",
