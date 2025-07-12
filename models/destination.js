@@ -15,9 +15,9 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Destination.associate = (models) => {
-    Destination.hasMany(models.Location, {
-      foreignKey: "destination_id",
-      as: "locations"
+    Destination.belongsTo(models.Location, {
+      foreignKey: "location_id",
+      as: "location"
     });
   };
 

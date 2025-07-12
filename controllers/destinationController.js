@@ -4,7 +4,7 @@ const generateCrudController = require("./generateCrudController");
 module.exports = generateCrudController(Destination, [
   {
     model: Location,
-    as: "locations",          // ✅ alias khớp với Destination.hasMany(Location, { as: "locations" })
+    as: "location",          // alias đúng với model mới
     attributes: ["id", "name"],
   },
 ]);

@@ -17,11 +17,11 @@ module.exports = (sequelize, DataTypes) => {
     updatedAt: 'updated_at'
   });
   Agency.associate = (models) => {
-  Agency.belongsTo(models.User, {
-    foreignKey: "user_id",
-    as: "user", 
-  });
-};
+    Agency.belongsTo(models.User, {
+      foreignKey: "user_id",
+      as: "user",
+    });
+  };
 
 
   return Agency;

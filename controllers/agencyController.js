@@ -102,3 +102,55 @@ exports.approveAgency = async (req, res) => {
     res.status(500).json({ message: "Lỗi server: " + err.message });
   }
 };
+
+/* LẤY DANH SÁCH AGENCY (Admin) */
+
+exports.getAgencies = async (req, res) => {
+  try {
+    // /api/agencies?page=1&limit=20&status=pending
+    const page   = +req.query.page  || 1;
+    const limit  = +req.query.limit || 20;
+    const where  = req.query.status ? { status: req.query.status } : {};
+
+    const { count, rows } = await Agency.findAndCountAll({
+      where,
+      offset: (page - 1) * limit,
+      limit,
+      include: [{ model: User, as: "user", attributes: ["id","name","email","status"] }],
+      order: [["createdAt", "DESC"]]
+    });
+
+    res.json({
+      data: rows,
+      pagination: {
+        total: count,
+        page,
+        pages: Math.ceil(count/limit)
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* LẤY CHI TIẾT AGENCY */
+
+exports.getAgency = async (req, res) => {
+  try {
+    const agency = await Agency.findByPk(req.params.id, {
+      include: [{ model: User, as: "user", attributes: ["id","name","email","status"] }]
+    });
+
+    if (!agency) return res.status(404).json({ message: "Không tìm thấy agency" });
+
+    // Nếu role=agency, chỉ cho xem chính mình
+    if (req.user.role === "agency" && req.user.id !== agency.user_id)
+      return res.status(403).json({ message: "Không có quyền xem agency khác" });
+
+    res.json({ data: agency });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+};
