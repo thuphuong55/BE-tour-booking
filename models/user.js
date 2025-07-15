@@ -5,11 +5,6 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true
     },
-    username: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true
-    },
     password_hash: {
       type: DataTypes.STRING,
       allowNull: false
@@ -34,8 +29,14 @@ module.exports = (sequelize, DataTypes) => {
     },
     name: {
       type: DataTypes.STRING,
-      allowNull: true // tên người/công ty đăng ký
-    }
+      allowNull: true,
+      unique: true // tên người/công ty đăng ký
+    },
+    isVerified: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+}
+
   }, {
     timestamps: true, // ⚠️ Bật timestamps
     createdAt: 'created_at',
