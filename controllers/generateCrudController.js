@@ -5,7 +5,13 @@ module.exports = (Model, include = []) => {
   return {
     async getAll(req, res) {
       try {
-        const rows = await Model.findAll({ include: defaultInclude });
+        // Lọc theo query param (ví dụ: user_id)
+        const where = {};
+        if (req.query.user_id) {
+          where.user_id = req.query.user_id;
+        }
+        // Có thể bổ sung các filter khác ở đây
+        const rows = await Model.findAll({ where, include: defaultInclude });
         res.json(rows);
       } catch (err) {
         console.error(err);
