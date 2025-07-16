@@ -37,6 +37,7 @@ const register = async (req, res) => {
       "Mã xác thực tài khoản",
       `<p>Mã xác thực là: <b>${otp}</b></p>`
     );
+   
 
     res.json({ message: "Đã gửi mã xác thực qua email" });
   } catch (err) {

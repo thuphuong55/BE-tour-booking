@@ -68,7 +68,20 @@ const getById = async (req, res) => {
 // Tạo tour mới
 const create = async (req, res) => {
   try {
-    const tour = await Tour.create(req.body);
+    const {
+      hotel_ids = [],
+      category_ids = [],
+      included_service_ids = [],
+      ...tourData
+    } = req.body;
+
+    const tour = await Tour.create(tourData);
+
+    //Gán các quan hệ Nhiều-Nhiều
+    if (hotel_ids.length > 0) await tour.setHotels(hotel_ids);
+    if (category_ids.length > 0) await tour.setCategories(category_ids);
+    if (included_service_ids.length > 0) await tour.setIncludedServices(included_service_ids);
+
     res.status(201).json(tour);
   } catch (err) {
     console.error("Lỗi khi tạo tour:", err);
@@ -76,21 +89,41 @@ const create = async (req, res) => {
   }
 };
 
+
 // Cập nhật tour
 const update = async (req, res) => {
   try {
+    const {
+      hotel_ids = [],
+      category_ids = [],
+      included_service_ids = [],
+      ...tourData
+    } = req.body;
+
     const tour = await Tour.findByPk(req.params.id);
     if (!tour) {
       return res.status(404).json({ message: "Không tìm thấy tour" });
     }
 
-    await tour.update(req.body);
+    await tour.update(tourData);
+
+    //Cập nhật lại quan hệ Nhiều-Nhiều
+    if (hotel_ids.length > 0) await tour.setHotels(hotel_ids);
+    else await tour.setHotels([]); // clear nếu bỏ chọn hết
+
+    if (category_ids.length > 0) await tour.setCategories(category_ids);
+    else await tour.setCategories([]);
+
+    if (included_service_ids.length > 0) await tour.setIncludedServices(included_service_ids);
+    else await tour.setIncludedServices([]);
+
     res.json(tour);
   } catch (err) {
     console.error("Lỗi khi cập nhật tour:", err);
     res.status(400).json({ message: "Dữ liệu cập nhật không hợp lệ", error: err.message });
   }
 };
+
 
 // Xoá tour
 const remove = async (req, res) => {
