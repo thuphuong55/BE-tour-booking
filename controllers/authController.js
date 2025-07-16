@@ -133,3 +133,117 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
+// [GET] /api/auth/me - Get current user info
+exports.getUserInfo = async (req, res) => {
+  try {
+    // req.user is set by the protect middleware
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['id', 'username', 'email', 'role', 'status', 'name', 'created_at', 'updated_at']
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "Người dùng không tồn tại" });
+    }
+
+    return res.status(200).json({
+      message: "Lấy thông tin người dùng thành công",
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        name: user.name,
+        created_at: user.created_at,
+        updated_at: user.updated_at
+      }
+    });
+  } catch (err) {
+    console.error("Error getting user info:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+// [PUT] /api/auth/me - Update current user info
+exports.updateUserInfo = async (req, res) => {
+  try {
+    const { username, email, name, currentPassword, newPassword } = req.body;
+    
+    // Lấy thông tin user hiện tại
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "Người dùng không tồn tại" });
+    }
+
+    // Kiểm tra email trùng lặp (nếu thay đổi email)
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ message: "Email đã được sử dụng bởi người dùng khác" });
+      }
+    }
+
+    // Kiểm tra username trùng lặp (nếu thay đổi username)
+    if (username && username !== user.username) {
+      const existingUser = await User.findOne({ where: { username } });
+      if (existingUser) {
+        return res.status(400).json({ message: "Username đã được sử dụng bởi người dùng khác" });
+      }
+    }
+
+    // Nếu muốn đổi mật khẩu, phải cung cấp mật khẩu hiện tại
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ message: "Vui lòng cung cấp mật khẩu hiện tại để đổi mật khẩu mới" });
+      }
+
+      // Kiểm tra mật khẩu hiện tại
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ message: "Mật khẩu hiện tại không đúng" });
+      }
+
+      // Validate mật khẩu mới
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự" });
+      }
+    }
+
+    // Chuẩn bị dữ liệu cập nhật
+    const updateData = {};
+    if (username) updateData.username = username;
+    if (email) updateData.email = email;
+    if (name !== undefined) updateData.name = name; // Cho phép set name = null
+    
+    // Hash mật khẩu mới nếu có
+    if (newPassword) {
+      updateData.password_hash = await bcrypt.hash(newPassword, 10);
+    }
+
+    // Cập nhật thông tin user
+    await user.update(updateData);
+
+    // Trả về thông tin user đã cập nhật (không bao gồm password)
+    const updatedUser = await User.findByPk(req.user.id, {
+      attributes: ['id', 'username', 'email', 'role', 'status', 'name', 'created_at', 'updated_at']
+    });
+
+    return res.status(200).json({
+      message: "Cập nhật thông tin người dùng thành công",
+      user: {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        status: updatedUser.status,
+        name: updatedUser.name,
+        created_at: updatedUser.created_at,
+        updated_at: updatedUser.updated_at
+      }
+    });
+  } catch (err) {
+    console.error("Error updating user info:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+};
+

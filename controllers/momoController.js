@@ -30,11 +30,20 @@ exports.createPayment = async (req, res) => {
       return res.status(400).json({ message: 'Giá tour không hợp lệ để thanh toán MoMo' });
     }
 
-
     // Sử dụng FE Next.js port 3000 cho redirectUrl
     const redirectUrl = `http://localhost:3000/tour/${tour.id}/confirmation`;
     const orderInfo = `Thanh toán tour ${tour.name}`;
     const momoRes = await createMomoPayment(orderInfo, amount, redirectUrl);
+
+    // Tạo payment record trong database với method MoMo
+    if (momoRes.orderId) {
+      await paymentController.createPayment({
+        bookingId: null, // MoMo có thể không có bookingId ngay lập tức
+        amount,
+        method: "MoMo",
+        orderId: momoRes.orderId
+      });
+    }
 
     res.json(momoRes);
   } catch (error) {

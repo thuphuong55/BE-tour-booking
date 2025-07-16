@@ -10,5 +10,19 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: false
   });
 
+  Itinerary.associate = (models) => {
+    Itinerary.belongsTo(models.Tour, {
+      foreignKey: 'tour_id',
+      as: 'tour'
+    });
+
+    Itinerary.belongsToMany(models.Location, {
+      through: models.ItineraryLocation,
+      foreignKey: 'itinerary_id',
+      otherKey: 'location_id',
+      as: 'locations'
+    });
+  };
+
   return Itinerary;
 };

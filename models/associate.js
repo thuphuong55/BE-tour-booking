@@ -30,7 +30,8 @@ fs.readdirSync(__dirname)
 const {
   User, Tour, TourSchedule, TourPricing, Booking, Review, TourImage, Payment, FAQ,
   Promotion, TourCategory, TourTourCategory, Location, Itinerary, ItineraryLocation,
-  TourIncludedService, ExcludedService, TourExcludedService
+  TourIncludedService, IncludedService, ExcludedService, TourExcludedService, DepartureDate,
+  Hotel, TourHotel
 } = db;
 
 // Booking - User
@@ -61,32 +62,60 @@ TourPricing.belongsTo(Tour, { foreignKey: 'tour_id' });
 Tour.hasMany(TourImage, { foreignKey: 'tour_id' });
 TourImage.belongsTo(Tour, { foreignKey: 'tour_id' });
 
-// Tour - IncludedService
-Tour.hasMany(TourIncludedService, { foreignKey: 'tour_id' });
-TourIncludedService.belongsTo(Tour, { foreignKey: 'tour_id' });
+// Tour - IncludedService (many-to-many)
+Tour.belongsToMany(IncludedService, {
+  through: TourIncludedService,
+  foreignKey: 'tour_id',
+  otherKey: 'included_service_id',
+  as: 'includedServices'
+});
+IncludedService.belongsToMany(Tour, {
+  through: TourIncludedService,
+  foreignKey: 'included_service_id',
+  otherKey: 'tour_id',
+  as: 'tours'
+});
 
 // Tour - ExcludedService (many-to-many)
 Tour.belongsToMany(ExcludedService, {
   through: TourExcludedService,
   foreignKey: 'tour_id',
-  otherKey: 'excluded_service_id'
+  otherKey: 'excluded_service_id',
+  as: 'excludedServices'
 });
 ExcludedService.belongsToMany(Tour, {
   through: TourExcludedService,
   foreignKey: 'excluded_service_id',
-  otherKey: 'tour_id'
+  otherKey: 'tour_id',
+  as: 'tours'
 });
 
 // Tour - TourCategory (many-to-many)
 Tour.belongsToMany(TourCategory, {
   through: TourTourCategory,
   foreignKey: 'tour_id',
-  otherKey: 'category_id'
+  otherKey: 'category_id',
+  as: 'categories'
 });
 TourCategory.belongsToMany(Tour, {
   through: TourTourCategory,
   foreignKey: 'category_id',
-  otherKey: 'tour_id'
+  otherKey: 'tour_id',
+  as: 'tours'
+});
+
+// Tour - Hotel (many-to-many)
+Tour.belongsToMany(Hotel, {
+  through: TourHotel,
+  foreignKey: 'tour_id',
+  otherKey: 'id_hotel',
+  as: 'hotels'
+});
+Hotel.belongsToMany(Tour, {
+  through: TourHotel,
+  foreignKey: 'id_hotel',
+  otherKey: 'tour_id',
+  as: 'tours'
 });
 
 // Itinerary - Tour

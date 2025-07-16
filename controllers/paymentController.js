@@ -32,7 +32,7 @@ exports.createPayment = async ({ bookingId, amount, method, orderId }) => {
   return await Payment.create({
     booking_id: bookingId,
     amount,
-    payment_method: method || 'MoMo',
+    payment_method: method, // Bắt buộc phải truyền method
     order_id: orderId || null,
     status: 'pending'
   });

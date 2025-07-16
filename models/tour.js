@@ -46,9 +46,21 @@ module.exports = (sequelize, DataTypes) => {
       as: 'includedServices'
     });
 
+    Tour.belongsToMany(models.ExcludedService, {
+      through: models.TourExcludedService,
+      foreignKey: 'tour_id',
+      otherKey: 'excluded_service_id',
+      as: 'excludedServices'
+    });
+
     Tour.hasMany(models.TourImage, {
       foreignKey: 'tour_id',
       as: 'images'
+    });
+
+    Tour.hasMany(models.Itinerary, {
+      foreignKey: 'tour_id',
+      as: 'itineraries'
     });
 
      Tour.hasMany(models.Review, {

@@ -7,5 +7,14 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: false
   });
 
+  ExcludedService.associate = models => {
+    ExcludedService.belongsToMany(models.Tour, {
+      through: models.TourExcludedService,
+      foreignKey: 'excluded_service_id',
+      otherKey: 'tour_id',
+      as: 'tours'
+    });
+  };
+
   return ExcludedService;
 };

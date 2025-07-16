@@ -40,6 +40,7 @@ app.use("/api/momo", require("./routes/momoRoutes"));
 app.use("/api/payments", require("./routes/paymentRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use('/api/search', require('./routes/searchRoutes'));
+app.use('/api/data', require('./routes/dataRoutes'));
 
 
 const PORT = process.env.PORT || 5000;

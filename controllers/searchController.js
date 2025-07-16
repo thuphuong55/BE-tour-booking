@@ -32,13 +32,14 @@ exports.getTopSearchLocations = async (req, res) => {
 
     const keywords = topKeywords.map(k => k.keyword);
 
+    const { Op } = require('sequelize');
     const locations = await Location.findAll({
       where: {
-        name: {
-          [Op.in]: keywords
-        }
+        [Op.or]: keywords.map(k => ({
+          name: { [Op.like]: `%${k}%` }
+        }))
       },
-      attributes: ["id", "name", "image_url"]
+      attributes: ["id", "name", "image_url", "description"]
     });
 
     res.json({ locations });
