@@ -16,25 +16,30 @@ exports.searchAvailableTours = async (req, res) => {
 
   try {
     const locations = await Location.findAll({
-      where: {
-        [Op.and]: [
-          // Nếu có lọc theo miền
-          region ? { name: { [Op.in]: provinceNames } } : {},
-
-          // So sánh không phân biệt hoa thường
+  where: {
+    [Op.and]: [
+      region ? { name: { [Op.in]: provinceNames } } : {},
+      {
+        [Op.or]: [
           where(fn('LOWER', col('Location.name')), {
+            [Op.like]: `%${kw}%`
+          }),
+          where(fn('LOWER', col('destinations.name')), {
             [Op.like]: `%${kw}%`
           })
         ]
-      },
-      include: [
-        {
-          model: Destination,
-          as: "destinations",
-          required: true // chỉ lấy những tỉnh có destination
-        }
-      ]
-    });
+      }
+    ]
+  },
+  include: [
+    {
+      model: Destination,
+      as: "destinations",
+      required: true
+    }
+  ]
+});
+
 
     if (locations.length === 0) {
       return res.status(404).json({ message: "Không có sẵn tour" });

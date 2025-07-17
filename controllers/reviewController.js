@@ -37,10 +37,7 @@ exports.getTourReviews = async (req, res) => {
     const { tourId } = req.params;
     const reviews = await Review.findAll({
       where: { tour_id: tourId },
-      include: {
-        model: User,
-        attributes: ["id", "name"]
-      },
+      include: [{ model: User, as: "user" }],
       order: [["review_date", "DESC"]]
     });
 
