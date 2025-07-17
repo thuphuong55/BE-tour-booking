@@ -68,6 +68,7 @@ const getById = async (req, res) => {
 // Tạo tour mới
 const create = async (req, res) => {
   try {
+<<<<<<< HEAD
     const tour = await Tour.create(req.body);
 
     // Thêm images
@@ -117,6 +118,21 @@ const create = async (req, res) => {
         await tour.setCategories(existingCategories.map(c => c.id));
       }
     }
+=======
+    const {
+      hotel_ids = [],
+      category_ids = [],
+      included_service_ids = [],
+      ...tourData
+    } = req.body;
+
+    const tour = await Tour.create(tourData);
+
+    //Gán các quan hệ Nhiều-Nhiều
+    if (hotel_ids.length > 0) await tour.setHotels(hotel_ids);
+    if (category_ids.length > 0) await tour.setCategories(category_ids);
+    if (included_service_ids.length > 0) await tour.setIncludedServices(included_service_ids);
+>>>>>>> 9293d14d46290bab0f60e2aef05d45d30df0ae82
 
     res.status(201).json(tour);
   } catch (err) {
@@ -125,14 +141,26 @@ const create = async (req, res) => {
   }
 };
 
+
 // Cập nhật tour
 const update = async (req, res) => {
   try {
+<<<<<<< HEAD
     console.log("Dữ liệu nhận được khi update tour:", req.body); // Log dữ liệu gửi lên
+=======
+    const {
+      hotel_ids = [],
+      category_ids = [],
+      included_service_ids = [],
+      ...tourData
+    } = req.body;
+
+>>>>>>> 9293d14d46290bab0f60e2aef05d45d30df0ae82
     const tour = await Tour.findByPk(req.params.id);
     if (!tour) {
       return res.status(404).json({ message: "Không tìm thấy tour" });
     }
+<<<<<<< HEAD
     await tour.update(req.body);
 
     // Cập nhật images
@@ -186,12 +214,28 @@ const update = async (req, res) => {
     }
 
     console.log("Tour sau khi update:", tour); // Log kết quả update
+=======
+
+    await tour.update(tourData);
+
+    //Cập nhật lại quan hệ Nhiều-Nhiều
+    if (hotel_ids.length > 0) await tour.setHotels(hotel_ids);
+    else await tour.setHotels([]); // clear nếu bỏ chọn hết
+
+    if (category_ids.length > 0) await tour.setCategories(category_ids);
+    else await tour.setCategories([]);
+
+    if (included_service_ids.length > 0) await tour.setIncludedServices(included_service_ids);
+    else await tour.setIncludedServices([]);
+
+>>>>>>> 9293d14d46290bab0f60e2aef05d45d30df0ae82
     res.json(tour);
   } catch (err) {
     console.error("Lỗi khi cập nhật tour:", err);
     res.status(400).json({ message: "Dữ liệu cập nhật không hợp lệ", error: err.message });
   }
 };
+
 
 // Xoá tour
 const remove = async (req, res) => {

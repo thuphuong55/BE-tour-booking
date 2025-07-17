@@ -1,4 +1,6 @@
 const { Review, Booking, User, Tour } = require("../models");
+const leoProfanity = require("../utils/profanity");
+
 
 exports.createReview = async (req, res) => {
   try {
@@ -16,6 +18,10 @@ exports.createReview = async (req, res) => {
     const existed = await Review.findOne({ where: { booking_id } });
     if (existed)
       return res.status(409).json({ message: "Bạn đã đánh giá booking này rồi." });
+
+    if (leoProfanity.check(comment)) {
+      return res.status(401).json({ message: "Bình luận chứa nội dung không phù hợp." });
+    }
 
     const review = await Review.create({
       booking_id,
@@ -76,6 +82,10 @@ exports.updateReview = async (req, res) => {
 
     if (!rating && !comment)
       return res.status(400).json({ message: "Không có dữ liệu cập nhật" });
+
+    if (comment && leoProfanity.check(comment)) {
+      return res.status(401).json({ message: "Bình luận chứa nội dung không phù hợp." });
+    }
 
     if (rating)  review.rating  = rating;
     if (comment) review.comment = comment;

@@ -42,6 +42,7 @@ const register = async (req, res) => {
       <hr>
       <p>Trân trọng,<br>Travel Tour Team</p>`
     );
+   
 
     res.json({ message: "Đã gửi mã xác thực qua email" });
   } catch (err) {
