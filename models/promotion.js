@@ -13,5 +13,12 @@ module.exports = (sequelize, DataTypes) => {
     updatedAt: 'updated_at'
   });
 
+  Promotion.associate = (models) => {
+    Promotion.hasMany(models.Tour, {
+      foreignKey: 'promotion_id',
+      as: 'tours'
+    });
+  };
+
   return Promotion;
 };

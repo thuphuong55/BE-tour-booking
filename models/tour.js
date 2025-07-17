@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
     destination: { type: DataTypes.STRING },
     departure_location: { type: DataTypes.STRING },
     price: { type: DataTypes.FLOAT, allowNull: true },
+    promotion_id: { type: DataTypes.UUID, allowNull: true },
     tour_type: { type: DataTypes.ENUM('Trong nước', 'Quốc tế'), defaultValue: 'Trong nước' },
     max_participants: { type: DataTypes.INTEGER, allowNull: false },
     min_participants: { type: DataTypes.INTEGER, defaultValue: 1 },
@@ -60,6 +61,12 @@ module.exports = (sequelize, DataTypes) => {
     foreignKey: 'agency_id',
     as: 'agency'
   });
+
+  Tour.belongsTo(models.Promotion, {
+  foreignKey: 'promotion_id',
+  as: 'promotion'
+  });
+
  };
 return Tour;
 };

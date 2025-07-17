@@ -1,6 +1,6 @@
-const { Tour, DepartureDate, TourImage, IncludedService, TourCategory } = require("../models");
+const { Tour, DepartureDate, TourImage, IncludedService, TourCategory, Promotion } = require("../models");
 
-// Lấy tất cả tour kèm các ngày khởi hành và ảnh
+// Lấy tất cả tour kèm các ngày khởi hành và ảnh, giảm giá nếu có
 const getAll = async (req, res) => {
   try {
     const tours = await Tour.findAll({
@@ -20,17 +20,43 @@ const getAll = async (req, res) => {
           model: TourImage,
           as: 'images',
           attributes: ['id', 'image_url', 'is_main']
+        },
+        {
+          model: Promotion,
+          as: 'promotion'
         }
       ]
     });
-    res.json(tours);
+
+    const now = new Date();
+
+    // Áp dụng giảm giá nếu promotion đang còn hiệu lực
+    const tourWithFinalPrices = tours.map((tour) => {
+      const tourData = tour.toJSON();
+
+      let final_price = tour.price;
+      if (
+        tour.promotion &&
+        new Date(tour.promotion.start_date) <= now &&
+        new Date(tour.promotion.end_date) >= now
+      ) {
+        final_price = Math.max(0, tour.price - parseFloat(tour.promotion.discount_amount));
+      }
+
+      return {
+        ...tourData,
+        final_price,
+        promotion_applied: tour.promotion?.code || null
+      };
+    });
+
+    res.json(tourWithFinalPrices);
   } catch (err) {
     console.error("Lỗi khi lấy danh sách tour:", err);
     res.status(500).json({ message: 'Lỗi server' });
   }
 };
 
-// Lấy 1 tour theo ID kèm ảnh và ngày khởi hành
 const getById = async (req, res) => {
   try {
     const tour = await Tour.findByPk(req.params.id, {
@@ -50,6 +76,10 @@ const getById = async (req, res) => {
           model: TourImage,
           as: 'images',
           attributes: ['id', 'image_url', 'is_main']
+        },
+        {
+          model: Promotion,
+          as: 'promotion' 
         }
       ]
     });
@@ -58,7 +88,23 @@ const getById = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tour" });
     }
 
-    res.json(tour);
+    // Tính giá sau khuyến mãi nếu đang trong thời gian hiệu lực
+    let final_price = tour.price;
+    const now = new Date();
+
+    if (
+      tour.promotion &&
+      new Date(tour.promotion.start_date) <= now &&
+      new Date(tour.promotion.end_date) >= now
+    ) {
+      final_price = Math.max(0, tour.price - parseFloat(tour.promotion.discount_amount));
+    }
+
+    res.json({
+      ...tour.toJSON(),
+      final_price,
+      promotion_applied: tour.promotion?.code || null
+    });
   } catch (err) {
     console.error("Lỗi khi lấy tour theo ID:", err);
     res.status(500).json({ message: "Lỗi server" });
@@ -72,20 +118,40 @@ const create = async (req, res) => {
       hotel_ids = [],
       category_ids = [],
       included_service_ids = [],
+      promotion_id = null,
       ...tourData
     } = req.body;
 
-    const tour = await Tour.create(tourData);
+    const tour = await Tour.create({
+      ...tourData,
+      promotion_id
+    });
 
-    //Gán các quan hệ Nhiều-Nhiều
-    if (hotel_ids.length > 0) await tour.setHotels(hotel_ids);
-    if (category_ids.length > 0) await tour.setCategories(category_ids);
-    if (included_service_ids.length > 0) await tour.setIncludedServices(included_service_ids);
+    // Load lại tour đã tạo cùng với promotion
+    const fullTour = await Tour.findByPk(tour.id, {
+      include: [{ model: Promotion, as: 'promotion' }]
+    });
 
-    res.status(201).json(tour);
+    // Tính final_price nếu có giảm giá
+    let final_price = fullTour.price;
+    const now = new Date();
+
+    if (
+      fullTour.promotion &&
+      new Date(fullTour.promotion.start_date) <= now &&
+      new Date(fullTour.promotion.end_date) >= now
+    ) {
+      final_price = Math.max(0, fullTour.price - parseFloat(fullTour.promotion.discount_amount));
+    }
+
+    res.status(201).json({
+      ...fullTour.toJSON(),
+      final_price,
+      promotion_applied: fullTour.promotion?.code || null
+    });
   } catch (err) {
     console.error("Lỗi khi tạo tour:", err);
-    res.status(400).json({ message: "Dữ liệu không hợp lệ", error: err.message });
+    res.status(400).json({ message: "Lỗi tạo tour", error: err.message });
   }
 };
 
@@ -97,6 +163,7 @@ const update = async (req, res) => {
       hotel_ids = [],
       category_ids = [],
       included_service_ids = [],
+      promotion_id = null,
       ...tourData
     } = req.body;
 
@@ -105,7 +172,7 @@ const update = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tour" });
     }
 
-    await tour.update(tourData);
+    await tour.update({ ...tourData, promotion_id });
 
     //Cập nhật lại quan hệ Nhiều-Nhiều
     if (hotel_ids.length > 0) await tour.setHotels(hotel_ids);
