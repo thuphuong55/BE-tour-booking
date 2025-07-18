@@ -45,6 +45,7 @@ exports.getTourReviews = async (req, res) => {
       where: { tour_id: tourId },
       include: {
         model: User,
+        as: "user",
         attributes: ["id", "name"]
       },
       order: [["review_date", "DESC"]]
