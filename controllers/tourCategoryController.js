@@ -1,4 +1,4 @@
-const { TourCategory, Tour } = require("../models");
+const { TourCategory, Tour, TourImage, DepartureDate, Promotion } = require("../models");
 
 // GET /categories
 const getAll = async (req, res) => {
@@ -72,7 +72,22 @@ const remove = async (req, res) => {
 const getCategoryWithTours = async (req, res) => {
   try {
     const category = await TourCategory.findByPk(req.params.id, {
-      include: [{ model: Tour, as: "tours" }]
+      include: [{
+        model: Tour,
+        as: "tours",
+        include: [
+          {
+            model: TourImage,
+            as: 'images',
+            attributes: ['id', 'image_url', 'is_main']
+          },
+          {
+            model: DepartureDate,
+            as: 'departureDates',
+            attributes: ['id', 'departure_date', 'number_of_days', 'end_date']
+          }
+        ]
+      }]
     });
 
     if (!category) {
@@ -86,11 +101,64 @@ const getCategoryWithTours = async (req, res) => {
   }
 };
 
+// GET /categories/:id/tours-only - Chỉ lấy tours của category
+const getToursByCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const category = await TourCategory.findByPk(id);
+    if (!category) {
+      return res.status(404).json({ message: "Không tìm thấy danh mục!" });
+    }
+
+    const tours = await Tour.findAndCountAll({
+      include: [
+        {
+          model: TourCategory,
+          as: 'categories',
+          where: { id: id },
+          attributes: []
+        },
+        {
+          model: TourImage,
+          as: 'images',
+          attributes: ['id', 'image_url', 'is_main']
+        },
+        {
+          model: DepartureDate,
+          as: 'departureDates',
+          attributes: ['id', 'departure_date', 'number_of_days', 'end_date']
+        }
+      ],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      distinct: true
+    });
+
+    res.json({
+      category: category,
+      tours: tours.rows,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(tours.count / limit),
+        totalTours: tours.count,
+        limit: parseInt(limit)
+      }
+    });
+  } catch (error) {
+    console.error("Lỗi lấy tours theo category:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
   delete: remove,
-  getCategoryWithTours
+  getCategoryWithTours,
+  getToursByCategory
 };

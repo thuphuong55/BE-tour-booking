@@ -5,6 +5,6 @@ module.exports = generateCrudController(Location, [
   {
     model: Destination,
     as: "destinations",
-    attributes: ["id", "name"],
+    attributes: ["id", "name", "image"],
   },
 ]);

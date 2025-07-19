@@ -1,7 +1,11 @@
 module.exports = (sequelize, DataTypes) => {
   const Agency = sequelize.define('Agency', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-    user_id: { type: DataTypes.UUID, allowNull: false, references: { model: 'User', key: 'id' } },
+    user_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'user_id'
+    },
     name: { type: DataTypes.STRING, allowNull: false },
     email: { type: DataTypes.STRING, allowNull: false, unique: true },
     phone: { type: DataTypes.STRING, allowNull: false },

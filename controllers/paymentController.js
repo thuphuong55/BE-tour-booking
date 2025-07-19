@@ -15,11 +15,28 @@ exports.getByOrderId = async (req, res) => {
   try {
     const { orderId } = req.params;
     const payment = await Payment.findOne({
-      where: { order_id: orderId },
-      include: [{ model: Booking, as: 'booking' }]
+      where: { order_id: orderId }
     });
-    if (!payment) return res.status(404).json({ message: 'Không tìm thấy payment với orderId này' });
-    res.json(payment);
+    if (!payment) {
+      return res.status(404).json({ message: 'Không tìm thấy payment với orderId này' });
+    }
+    
+    // Lấy booking riêng để tránh association issues
+    let booking = null;
+    if (payment.booking_id) {
+      try {
+        booking = await Booking.findByPk(payment.booking_id);
+      } catch (bookingError) {
+        console.log('Warning: Could not load booking details:', bookingError.message);
+      }
+    }
+    
+    const result = {
+      ...payment.toJSON(),
+      booking: booking
+    };
+    
+    res.json(result);
   } catch (error) {
     console.error('Error getByOrderId:', error);
     res.status(500).json({ message: 'Lỗi lấy thông tin payment theo orderId' });
@@ -29,6 +46,7 @@ const { Payment, Booking } = require('../models');
 
 //Dùng khi tạo thanh toán từ bookingController
 exports.createPayment = async ({ bookingId, amount, method, orderId }) => {
+  console.log('paymentController.createPayment params:', { bookingId, amount, method, orderId });
   return await Payment.create({
     booking_id: bookingId,
     amount,

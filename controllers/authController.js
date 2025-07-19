@@ -68,13 +68,19 @@ exports.login = async (req, res) => {
     });
 
 
+    let agencyId = null;
+    if (user.role === "agency") {
+      const agency = await require("../models").Agency.findOne({ where: { user_id: user.id } });
+      if (agency) agencyId = agency.id;
+    }
     return res.json({
       message: "Login successful",
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        ...(agencyId && { agency_id: agencyId })
       },
       token
     });

@@ -32,6 +32,18 @@ module.exports = (Model, include = []) => {
 
     async create(req, res) {
       try {
+        // Validate foreign key cho Destination
+        if (Model.name === 'Destination' && req.body.location_id) {
+          const { Location } = require("../models");
+          const location = await Location.findByPk(req.body.location_id);
+          if (!location) {
+            return res.status(400).json({ 
+              error: "Invalid location_id", 
+              message: `Location với ID ${req.body.location_id} không tồn tại`
+            });
+          }
+        }
+        
         const row = await Model.create(req.body);
         res.status(201).json(row);
       } catch (err) {
@@ -42,6 +54,18 @@ module.exports = (Model, include = []) => {
 
     async update(req, res) {
       try {
+        // Validate foreign key cho Destination
+        if (Model.name === 'Destination' && req.body.location_id) {
+          const { Location } = require("../models");
+          const location = await Location.findByPk(req.body.location_id);
+          if (!location) {
+            return res.status(400).json({ 
+              error: "Invalid location_id", 
+              message: `Location với ID ${req.body.location_id} không tồn tại`
+            });
+          }
+        }
+        
         // Lọc ra các trường hợp lệ của model
         const modelAttributes = Object.keys(Model.rawAttributes);
         const validData = {};
@@ -67,6 +91,34 @@ module.exports = (Model, include = []) => {
       try {
         const item = await Model.findByPk(req.params.id);
         if (!item) return res.status(404).json({ message: "Không tìm thấy" });
+        
+        // Xử lý cascade delete cho Location
+        if (Model.name === 'Location') {
+          const { ItineraryLocation, Destination } = require("../models");
+          
+          // Xóa itinerary_location records trước
+          await ItineraryLocation.destroy({
+            where: { location_id: req.params.id }
+          });
+          
+          // Xóa destination records
+          await Destination.destroy({
+            where: { location_id: req.params.id }
+          });
+        }
+        
+        // Xử lý cascade delete cho Destination
+        if (Model.name === 'Destination') {
+          const { ItineraryLocation } = require("../models");
+          
+          // Nếu destination có location_id, xóa itinerary_location references
+          if (item.location_id) {
+            await ItineraryLocation.destroy({
+              where: { location_id: item.location_id }
+            });
+          }
+        }
+        
         await item.destroy();
         res.json({ message: "Đã xoá thành công" });
       } catch (err) {

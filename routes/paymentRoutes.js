@@ -5,6 +5,9 @@ const paymentController = require("../controllers/paymentController");
 const momoController = require("../controllers/momoController");
 const vnpayController = require("../controllers/vnpayController");
 const router = express.Router();
+
+// Payment details routes
+router.get('/details/:orderId', paymentController.getByOrderId);
 router.get('/by-order/:orderId', paymentController.getByOrderId);
 
 router.get('/:id', paymentController.getById);

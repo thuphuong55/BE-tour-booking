@@ -12,6 +12,7 @@ const create = async (req, res) => {
       user_id,
       tour_id,
       departure_date_id,
+      promotion_id = null, // Thêm promotion_id
       total_price,
       number_of_adults,
       number_of_children,
@@ -41,6 +42,14 @@ const create = async (req, res) => {
       await t.rollback();
       return res.status(400).json({ message: "Ngày khởi hành không thuộc tour đã chọn." });
     }
+    
+    // Lấy thông tin tour để có giá gốc
+    const tour = await Tour.findByPk(tour_id);
+    if (!tour) {
+      await t.rollback();
+      return res.status(404).json({ message: "Không tìm thấy tour." });
+    }
+    
     const today = new Date();
     const minDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3);
     if (new Date(departure.departure_date) < minDate) {
@@ -49,11 +58,18 @@ const create = async (req, res) => {
     }
 
     /* ────────── 2. Tạo booking ────────── */
+    // Tính discount amount nếu có promotion
+    const original_price = tour.price * (number_of_adults + number_of_children);
+    const discount_amount = original_price - total_price;
+    
     const booking = await Booking.create({
       user_id,
       tour_id,
       departure_date_id,
-      total_price,
+      promotion_id,
+      original_price, // Giá gốc từ tour * số người
+      discount_amount, // Số tiền được giảm giá
+      total_price, // Giá cuối cùng sau discount
       number_of_adults,
       number_of_children,
       status

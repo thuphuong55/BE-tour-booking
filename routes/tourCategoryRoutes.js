@@ -11,6 +11,9 @@ router.get("/:id", controller.getById);
 // Lấy 1 danh mục kèm danh sách tour liên quan
 router.get("/:id/tours", controller.getCategoryWithTours);
 
+// Lấy tours theo category với pagination
+router.get("/:id/tours-only", controller.getToursByCategory);
+
 // Thêm danh mục
 router.post("/", controller.create);
 

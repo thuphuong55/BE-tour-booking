@@ -1,3 +1,36 @@
+// Lấy agency theo user_id
+exports.getAgencyByUserId = async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const dbSequelize = db.sequelize || db;
+    // Liệt kê tất cả user_id trong bảng agency để debug
+    const [allUserIds] = await dbSequelize.query('SELECT user_id FROM agency');
+    console.log('Tất cả user_id trong bảng agency:', allUserIds.map(u => u.user_id));
+    const { userId } = req.params;
+    const { Op } = require('sequelize');
+    console.log('userId param:', userId, typeof userId);
+    // Sequelize query
+    const agency = await Agency.findOne({ where: { user_id: { [Op.eq]: String(userId) } } });
+    console.log('agency found (Sequelize):', agency);
+
+    // Raw SQL query
+    const [results, metadata] = await dbSequelize.query('SELECT * FROM agency WHERE user_id = ?', { replacements: [userId] });
+    console.log('agency found (RAW SQL):', results);
+
+    const [rows] = await dbSequelize.query('SELECT DATABASE() as db');
+    console.log('Current DB:', rows[0].db);
+
+    if (!agency && (!results || results.length === 0)) {
+      return res.status(404).json({ message: 'Không tìm thấy agency với user_id này' });
+    }
+    res.json({
+      agencySequelize: agency,
+      agencyRaw: results
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server', error: err.message });
+  }
+};
 // controllers/agencyController.js
 const { Agency, User } = require("../models");
 const crypto  = require("crypto");

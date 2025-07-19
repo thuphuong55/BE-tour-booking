@@ -3,6 +3,7 @@ require("dotenv").config();
 
 exports.protect = (allowedRoles = []) => {
   return (req, res, next) => {
+    console.log('[protect] Middleware called');
     try {
       const authHeader = req.headers.authorization;
 
@@ -24,6 +25,9 @@ exports.protect = (allowedRoles = []) => {
       }
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = decoded;
+      console.log('[protect] req.user:', req.user);
+
+
 
       // Nếu yêu cầu role và user không thuộc role
       if (allowedRoles.length > 0 && !allowedRoles.includes(decoded.role)) {

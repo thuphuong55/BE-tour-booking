@@ -10,7 +10,12 @@ app.use(cors());
 app.use(express.json());
 
 // Import tất cả routes
+// Agency Management Routes (phải đặt trước /api/agency)  
+app.use("/api/agency/bookings", require("./routes/agencyBookingRoutes"));
+app.use("/api/agency/payments", require("./routes/agencyPaymentRoutes"));
+
 app.use("/api/agencies", require("./routes/agencyRoutes"));
+app.use("/api/agency", require("./routes/agencyRoutes"));
 app.use("/api/auth", require("./routes/authRoutes"));  
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/tours", require("./routes/tourRoutes"));
@@ -28,6 +33,7 @@ app.use("/api/tour-tour-categories", require("./routes/tourTourCategoryRoutes"))
 app.use("/api/itinerary-locations", require("./routes/itineraryLocationRoutes"));
 app.use("/api/departure-dates", require("./routes/departureDateRoutes"));
 app.use("/api/hotels", require("./routes/hotelRoutes"));
+app.use("/api/hotel-locations", require("./routes/hotelLocationRoutes"));
 app.use("/api/tour-hotels", require("./routes/tourHotelRoutes"));
 app.use("/api/tour-images", require("./routes/tourImageRoutes"));
 app.use("/api/provinces", require ("./routes/provinceRoutes"));
@@ -42,7 +48,13 @@ app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use('/api/search', require('./routes/searchRoutes'));
 app.use('/api/data', require('./routes/dataRoutes'));
 
+// Admin Management Routes
+app.use("/api/admin/bookings", require("./routes/adminBookingRoutes"));
+app.use("/api/admin/payments", require("./routes/adminPaymentRoutes"));
+app.use("/api/admin/commissions", require("./routes/commissionRoutes"));
+app.use("/api/dashboard/commissions", require("./routes/dashboardCommissionRoutes"));
 
-const PORT = process.env.PORT || 5000;
+
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 module.exports = app;

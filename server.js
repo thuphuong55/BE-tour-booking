@@ -4,7 +4,7 @@ const detectPort = require('detect-port').default;
 const cron = require("node-cron");
 const expireBookingsJob = require("./jobs/expireBookings");
 
-const DEFAULT_PORT = process.env.PORT || 5000;
+const DEFAULT_PORT = process.env.PORT || 5001;
 
 detectPort(DEFAULT_PORT).then(port => {
   if (port === DEFAULT_PORT) {
@@ -22,8 +22,8 @@ detectPort(DEFAULT_PORT).then(port => {
 });
 
 
-// Chạy mỗi phút
-cron.schedule("* * * * *", async () => {
+// Chạy mỗi 15 phút thay vì mỗi phút để giảm spam logs
+cron.schedule("*/15 * * * *", async () => {
   console.log("[Cron] Đang kiểm tra booking hết hạn...");
   await expireBookingsJob();
 });

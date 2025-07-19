@@ -1,5 +1,13 @@
 const express = require("express");
 const router = express.Router();
+const agencyController = require('../controllers/agencyController');
+
+// ...existing routes...
+
+// Lấy agency theo user_id
+router.get('/by-user/:userId', agencyController.getAgencyByUserId);
+
+module.exports = router;
 const agencyCtrl = require("../controllers/agencyController");
 
 const rateLimiter = require("../middlewares/rateLimiter");

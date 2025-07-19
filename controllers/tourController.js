@@ -1,9 +1,29 @@
-const { Tour, DepartureDate, TourImage, IncludedService, TourCategory, Hotel, ExcludedService, Itinerary, Location } = require("../models");
+const { Tour, DepartureDate, TourImage, IncludedService, TourCategory, Hotel, ExcludedService, Itinerary, Location, Promotion, Agency, Destination } = require("../models");
 
 // Lấy tất cả tour kèm các ngày khởi hành và ảnh
 const getAll = async (req, res) => {
   try {
+    // Phân quyền: admin xem tất cả, agency chỉ xem tour của mình
+    let where = {};
+    if (req.user && req.user.role === 'agency') {
+      // Tìm agency_id từ user_id
+      const agency = await Agency.findOne({
+        where: { user_id: req.user.id }
+      });
+      
+      if (agency) {
+        where.agency_id = agency.id;
+      } else {
+        // Nếu không tìm thấy agency, trả về mảng rỗng
+        return res.json([]);
+      }
+    }
+    // Nếu có query agency_id thì filter đúng agency_id
+    if (req.query.agency_id) {
+      where.agency_id = req.query.agency_id;
+    }
     const tours = await Tour.findAll({
+      where,
       include: [
         {
           model: DepartureDate,
@@ -20,6 +40,12 @@ const getAll = async (req, res) => {
           model: TourImage,
           as: 'images',
           attributes: ['id', 'image_url', 'is_main']
+        },
+        {
+          model: Promotion,
+          as: 'promotion',
+          attributes: ['id', 'code', 'description', 'discount_amount'],
+          required: false
         }
       ]
     });
@@ -68,7 +94,7 @@ const getById = async (req, res) => {
 // Tạo tour mới
 const create = async (req, res) => {
   try {
-<<<<<<< HEAD
+
     const tour = await Tour.create(req.body);
 
     // Thêm images
@@ -118,7 +144,7 @@ const create = async (req, res) => {
         await tour.setCategories(existingCategories.map(c => c.id));
       }
     }
-=======
+
     const {
       hotel_ids = [],
       category_ids = [],
@@ -126,13 +152,10 @@ const create = async (req, res) => {
       ...tourData
     } = req.body;
 
-    const tour = await Tour.create(tourData);
-
     //Gán các quan hệ Nhiều-Nhiều
     if (hotel_ids.length > 0) await tour.setHotels(hotel_ids);
     if (category_ids.length > 0) await tour.setCategories(category_ids);
     if (included_service_ids.length > 0) await tour.setIncludedServices(included_service_ids);
->>>>>>> 9293d14d46290bab0f60e2aef05d45d30df0ae82
 
     res.status(201).json(tour);
   } catch (err) {
@@ -145,9 +168,9 @@ const create = async (req, res) => {
 // Cập nhật tour
 const update = async (req, res) => {
   try {
-<<<<<<< HEAD
+
     console.log("Dữ liệu nhận được khi update tour:", req.body); // Log dữ liệu gửi lên
-=======
+
     const {
       hotel_ids = [],
       category_ids = [],
@@ -155,12 +178,10 @@ const update = async (req, res) => {
       ...tourData
     } = req.body;
 
->>>>>>> 9293d14d46290bab0f60e2aef05d45d30df0ae82
     const tour = await Tour.findByPk(req.params.id);
     if (!tour) {
       return res.status(404).json({ message: "Không tìm thấy tour" });
     }
-<<<<<<< HEAD
     await tour.update(req.body);
 
     // Cập nhật images
@@ -181,7 +202,7 @@ const update = async (req, res) => {
 
     // Cập nhật dịch vụ bao gồm
     if (req.body.selectedIncludedServices && req.body.selectedIncludedServices.length > 0) {
-      // Validate service IDs exist first
+      // Validate service ID exist first
       const existingServices = await IncludedService.findAll({
         where: { id: req.body.selectedIncludedServices }
       });
@@ -214,7 +235,7 @@ const update = async (req, res) => {
     }
 
     console.log("Tour sau khi update:", tour); // Log kết quả update
-=======
+
 
     await tour.update(tourData);
 
@@ -228,7 +249,6 @@ const update = async (req, res) => {
     if (included_service_ids.length > 0) await tour.setIncludedServices(included_service_ids);
     else await tour.setIncludedServices([]);
 
->>>>>>> 9293d14d46290bab0f60e2aef05d45d30df0ae82
     res.json(tour);
   } catch (err) {
     console.error("Lỗi khi cập nhật tour:", err);
@@ -442,6 +462,12 @@ const getTourComplete = async (req, res) => {
           attributes: ['id', 'image_url', 'is_main']
         },
         {
+          model: Promotion,
+          as: 'promotion',
+          attributes: ['id', 'code', 'description', 'discount_amount'],
+          required: false
+        },
+        {
           model: IncludedService,
           as: "includedServices",
           attributes: ['id', 'name']
@@ -529,6 +555,144 @@ const assignExcludedServiceToTour = async (req, res) => {
   }
 };
 
+// Lấy tours theo location (qua destinations hoặc itinerary)
+const getToursByLocation = async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const { Op } = require("sequelize");
+    const { sequelize } = require("../config/db");
+    
+    // Lấy thông tin location
+    const { Location } = require("../models");
+    const location = await Location.findByPk(locationId);
+    
+    if (!location) {
+      return res.status(404).json({ message: "Không tìm thấy location" });
+    }
+    
+    console.log(`Searching tours for location: ${location.name}`);
+    
+    // Tìm tours có location hoặc destination trùng với location name
+    const tours = await Tour.findAll({
+      where: {
+        [Op.or]: [
+          sequelize.where(
+            sequelize.fn('LOWER', sequelize.col('location')), 
+            'LIKE', 
+            `%${location.name.toLowerCase()}%`
+          ),
+          sequelize.where(
+            sequelize.fn('LOWER', sequelize.col('destination')), 
+            'LIKE', 
+            `%${location.name.toLowerCase()}%`
+          )
+        ]
+        // Removed status filter to see all tours
+      },
+      include: [
+        {
+          model: DepartureDate,
+          as: 'departureDates',
+          attributes: [
+            ['id', 'departureDates_id'],
+            'departure_date',
+            'end_date',
+            'number_of_days',
+            'number_of_nights'
+          ]
+        },
+        {
+          model: TourImage,
+          as: 'images',
+          attributes: ['id', 'image_url', 'is_main']
+        },
+        {
+          model: Promotion,
+          as: 'promotion',
+          attributes: ['id', 'code', 'description', 'discount_amount'],
+          required: false
+        }
+      ]
+    });
+    
+    console.log(`Found ${tours.length} tours for location ${location.name}`);
+    res.json(tours);
+    
+  } catch (err) {
+    console.error("Lỗi khi lấy tours theo location:", err);
+    res.status(500).json({ message: "Lỗi server", error: err.message });
+  }
+};
+
+// Lấy tours theo destination
+const getToursByDestination = async (req, res) => {
+  try {
+    const { destinationId } = req.params;
+    const { Op } = require("sequelize");
+    const { sequelize } = require("../config/db");
+    const { Destination } = require("../models");
+    
+    // Tìm destination để lấy tên
+    const destination = await Destination.findByPk(destinationId);
+    if (!destination) {
+      return res.status(404).json({ message: "Không tìm thấy destination" });
+    }
+    
+    console.log(`Searching tours for destination: ${destination.name}`);
+    
+    // Tìm tours có location hoặc destination trùng với destination name
+    const tours = await Tour.findAll({
+      where: {
+        [Op.or]: [
+          sequelize.where(
+            sequelize.fn('LOWER', sequelize.col('location')), 
+            'LIKE', 
+            `%${destination.name.toLowerCase()}%`
+          ),
+          sequelize.where(
+            sequelize.fn('LOWER', sequelize.col('destination')), 
+            'LIKE', 
+            `%${destination.name.toLowerCase()}%`
+          )
+        ]
+      },
+      include: [
+        {
+          model: DepartureDate,
+          as: 'departureDates',
+          attributes: [
+            ['id', 'departureDates_id'],
+            'departure_date',
+            'end_date',
+            'number_of_days',
+            'number_of_nights'
+          ]
+        },
+        {
+          model: TourImage,
+          as: 'images',
+          attributes: ['id', 'image_url', 'is_main']
+        },
+        {
+          model: Promotion,
+          as: 'promotion',
+          attributes: ['id', 'code', 'description', 'discount_amount'],
+          required: false
+        }
+      ]
+    });
+    
+    console.log(`Found ${tours.length} tours for destination ${destination.name}`);
+    res.json(tours);
+  } catch (err) {
+    console.error("Lỗi khi lấy tours theo destination:", err);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+// Alias cho getTourComplete (tên khác)
+const getCompleteTour = getTourComplete;
+
 module.exports = {
   getAll,
   getById,
@@ -544,5 +708,8 @@ module.exports = {
   getTourWithItineraries,
   getTourComplete,
   assignHotelToTour,
-  assignExcludedServiceToTour
+  assignExcludedServiceToTour,
+  getToursByLocation,
+  getToursByDestination,
+  getCompleteTour
 };

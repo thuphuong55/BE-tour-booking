@@ -1,7 +1,8 @@
 module.exports = (sequelize, DataTypes) => {
   const TourCategory = sequelize.define('TourCategory', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-    name: { type: DataTypes.STRING, allowNull: false }
+    name: { type: DataTypes.STRING, allowNull: false },
+    image: { type: DataTypes.STRING, allowNull: true }
   }, {
     tableName: 'tour_category',
     timestamps: false
