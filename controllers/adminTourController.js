@@ -191,14 +191,94 @@ const getTourStats = async (req, res) => {
   } catch (err) {
     console.error("❌ Error in admin getTourStats:", err);
     res.status(500).json({ 
-      success: false,
+      success: false, 
       message: 'Lỗi khi lấy thống kê tour', 
       error: err.message 
     });
   }
 };
 
-// ✅ Admin - Duyệt tour
+// 📋 Admin - Lấy tour theo ID với đầy đủ thông tin
+const getTour = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🔍 Admin getTour - ID: ${id}`);
+    
+    const tour = await Tour.findByPk(id, {
+      include: [
+        {
+          model: Agency,
+          as: 'agency',
+          include: [{ 
+            model: User, 
+            as: 'user',
+            attributes: ['email', 'name']
+          }]
+        },
+        {
+          model: DepartureDate,
+          as: 'departureDates',
+          order: [['departure_date', 'ASC']]
+        },
+        {
+          model: TourImage,
+          as: 'images'
+        },
+        {
+          model: Promotion,
+          as: 'promotion',
+          attributes: ['id', 'name', 'discount_percentage', 'start_date', 'end_date']
+        },
+        {
+          model: TourCategory,
+          as: 'categories',
+          through: { attributes: [] }
+        },
+        {
+          model: IncludedService,
+          as: 'includedServices',
+          through: { attributes: [] }
+        },
+        {
+          model: ExcludedService,
+          as: 'excludedServices',
+          through: { attributes: [] }
+        },
+        {
+          model: Hotel,
+          as: 'hotels',
+          through: { attributes: [] }
+        },
+        {
+          model: Itinerary,
+          as: 'itineraries',
+          include: [{ model: Location, as: 'location' }]
+        }
+      ]
+    });
+    
+    if (!tour) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy tour'
+      });
+    }
+    
+    console.log(`✅ Admin getTour success - Tour: ${tour.name}`);
+    res.json({
+      success: true,
+      data: tour
+    });
+    
+  } catch (err) {
+    console.error("❌ Error in admin getTour:", err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy thông tin tour',
+      error: err.message
+    });
+  }
+};// ✅ Admin - Duyệt tour
 const approveTour = async (req, res) => {
   try {
     const { id } = req.params;
@@ -988,6 +1068,7 @@ const createTour = async (req, res) => {
 
 module.exports = {
   getAllTours,
+  getTour,
   getTourStats,
   approveTour,
   rejectTour,

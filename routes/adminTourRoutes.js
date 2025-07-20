@@ -31,4 +31,7 @@ router.delete("/:id", adminTourController.deleteTour);
 // 🔄 Bulk Operations
 router.patch("/bulk/status", adminTourController.bulkUpdateStatus);
 
+// 📋 Get single tour (phải đặt cuối để tránh conflict với /stats)
+router.get("/:id", adminTourController.getTour);
+
 module.exports = router;
