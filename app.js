@@ -4,8 +4,16 @@ require("dotenv").config();
 const app = express();
 const db = require("./models");
 
+// Import optimization middleware
+const optimizationMiddleware = require("./middleware/optimizationMiddleware");
+
+// Apply database sync
 db.sequelize.sync();
 
+// Apply optimization middleware FIRST (includes compression, security, monitoring)
+app.use(optimizationMiddleware);
+
+// CORS và JSON parsing (sau optimization middleware)
 app.use(cors());
 app.use(express.json());
 
@@ -79,5 +87,21 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Performance monitoring endpoint
+app.get('/api/health', (req, res) => {
+  const memUsage = process.memoryUsage();
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: {
+      rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB',
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB',
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + 'MB'
+    },
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 module.exports = app;

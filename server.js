@@ -6,19 +6,37 @@ const expireBookingsJob = require("./jobs/expireBookings");
 
 const DEFAULT_PORT = process.env.PORT || 5001;
 
+// Performance optimization: Pre-configure server settings
+const serverOptions = {
+  keepAlive: true,
+  keepAliveTimeout: 5000,
+  headersTimeout: 6000,
+  maxHeadersCount: 2000,
+  timeout: 30000
+};
+
 detectPort(DEFAULT_PORT).then(port => {
-  if (port === DEFAULT_PORT) {
-    app.listen(port, () => {
-      console.log(`✅ Server running on port ${port}`);
+  const server = app.listen(port, () => {
+    console.log(`🚀 Optimized Server running on port ${port}`);
+    console.log(`📊 Performance monitoring enabled`);
+    console.log(`🔧 Connection pooling: Active`);
+    console.log(`⚡ Response compression: Enabled`);
+  });
+
+  // Apply server optimizations
+  Object.assign(server, serverOptions);
+  
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('🛑 Shutting down gracefully...');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
     });
-  } else {
-    console.log(`⚠️ Port ${DEFAULT_PORT} is in use. Switching to ${port}...`);
-    app.listen(port, () => {
-      console.log(`✅ Server running on fallback port ${port}`);
-    });
-  }
+  });
+
 }).catch(err => {
-  console.error('Lỗi kiểm tra port:', err);
+  console.error('❌ Server startup error:', err);
 });
 
 
