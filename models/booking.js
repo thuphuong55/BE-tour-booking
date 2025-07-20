@@ -2,7 +2,11 @@ module.exports = (sequelize, DataTypes) => {
   const Booking = sequelize.define('Booking', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     user_id: { type: DataTypes.UUID, allowNull: false },
-    tour_id: { type: DataTypes.UUID, allowNull: false }, 
+    tour_id: { 
+      type: DataTypes.UUID, 
+      allowNull: false,
+      field: 'tour_schedule_id' // Map to actual database column name
+    }, 
     departure_date_id: { type: DataTypes.UUID, allowNull: false},
     promotion_id: { type: DataTypes.UUID, allowNull: true },
     original_price: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
