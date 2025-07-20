@@ -166,7 +166,10 @@ router.get("/with-promotions", async (req, res) => {
 });
 
 router.get("/:id", tourController.getById);
-router.post("/", tourController.create);
+
+// ⚠️ REMOVED DUPLICATE: router.post("/", tourController.create);
+// The correct POST route with middleware is defined below
+
 router.put("/:id", tourController.update);
 router.delete("/:id", tourController.delete);
 
@@ -193,17 +196,30 @@ router.post("/:tourId/included-services/:serviceId", tourController.assignInclud
 router.post("/:tourId/excluded-services/:serviceId", tourController.assignExcludedServiceToTour);
 router.post("/:tourId/hotels/:hotelId", tourController.assignHotelToTour);
 
+// POST route for creating tours - supports both admin and agency
 router.post(
   "/",
-  protect(["agency"]),
-  ensureAgencyApproved,
+  protect(["admin", "agency"]), // Admin và Agency đều có thể tạo tour
+  (req, res, next) => {
+    // Chỉ agency cần kiểm tra approved status
+    if (req.user.role === 'agency') {
+      return ensureAgencyApproved(req, res, next);
+    }
+    next(); // Admin bypass approval check
+  },
   tourController.create
 );
 
 router.put(
   "/:id",
-  protect(["agency"]),
-  ensureAgencyApproved,
+  protect(["admin", "agency"]), // Admin và Agency đều có thể update tour
+  (req, res, next) => {
+    // Chỉ agency cần kiểm tra approved status
+    if (req.user.role === 'agency') {
+      return ensureAgencyApproved(req, res, next);
+    }
+    next(); // Admin bypass approval check
+  },
   tourController.update
 );
 

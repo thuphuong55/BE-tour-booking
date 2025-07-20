@@ -17,7 +17,9 @@ router.get("/stats", adminTourController.getTourStats);
 
 // ✅ Tour Approval Operations
 router.patch("/:id/approve", adminTourController.approveTour);
+router.put("/:id/approve", adminTourController.approveTour);  // Support both PATCH and PUT
 router.patch("/:id/reject", adminTourController.rejectTour);
+router.put("/:id/reject", adminTourController.rejectTour);    // Support both PATCH and PUT
 
 // 🔄 Tour Status Management
 router.patch("/:id/status", adminTourController.updateTourStatus);

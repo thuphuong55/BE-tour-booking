@@ -34,6 +34,8 @@ app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/guest", require("./routes/guestRoutes")); // Guest booking routes
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/locations", require("./routes/locationRoutes"));
+app.use("/api/departure-locations", require("./routes/departureLocationRoutes"));
+app.use("/api/destination-location", require("./routes/destinationLocationRoutes")); // New endpoints for tour creation
 app.use("/api/itineraries", require("./routes/itineraryRoutes"));
 app.use("/api/tour-included-services", require("./routes/tourIncludedServiceRoutes"));
 app.use("/api/excluded-services", require("./routes/excludedServiceRoutes"));

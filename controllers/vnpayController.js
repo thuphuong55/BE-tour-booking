@@ -307,7 +307,8 @@ exports.vnpayReturn = async (req, res) => {
         // Không fail payment process nếu email fail
       }
       
-      return res.redirect("http://localhost:3000/payment-success");
+      // ✅ FIX: Thêm orderId và bookingId vào URL
+      return res.redirect(`http://localhost:3000/payment-success?orderId=${orderId}&bookingId=${bookingId}&method=VNPay`);
     } else {
       await paymentController.updatePaymentStatus(orderId, "failed");
       
@@ -320,7 +321,8 @@ exports.vnpayReturn = async (req, res) => {
         console.error('❌ Failed to send payment failed email:', emailError);
       }
       
-      return res.redirect("http://localhost:3000/payment-failed");
+      // ✅ FIX: Thêm thông tin lỗi vào URL
+      return res.redirect(`http://localhost:3000/payment-failed?orderId=${orderId}&bookingId=${bookingId}&method=VNPay`);
     }
   } catch (err) {
     console.error("Lỗi xử lý vnpayReturn:", err);

@@ -34,7 +34,7 @@ module.exports = (sequelize, DataTypes) => {
     Tour.belongsToMany(models.Hotel, {
       through: "tour_hotel",
       foreignKey: "tour_id",
-      otherKey: "id_hotel",
+      otherKey: "id_hotel", // Giữ nguyên vì đây là tên column trong junction table
       as: "hotels",
     });
 

@@ -12,8 +12,15 @@ const GUEST_USER_ID = "3ca8bb89-a406-4deb-96a7-dab4d9be3cc1";
 const create = async (req, res) => {
   const t = await sequelize.transaction();
   try {
+    // 🔍 DEBUG: Log incoming request
+    console.log('📋 BOOKING REQUEST DEBUG:');
+    console.log('- Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('- Body:', JSON.stringify(req.body, null, 2));
+    console.log('- User:', req.user ? `${req.user.id} (${req.user.email})` : 'null');
+    console.log('- Auth Header:', req.headers.authorization || 'none');
+    
     const {
-      user_id, // Optional - sẽ bị override bởi logic auto-detect
+      // user_id được loại bỏ - sẽ auto-detect từ authentication
       tour_id,
       departure_date_id,
       promotion_id = null,
@@ -43,7 +50,22 @@ const create = async (req, res) => {
       // 🎫 Guest vãng lai (không có token)
       finalUserId = GUEST_USER_ID;
       bookingType = "GUEST_USER";
-      console.log("🎫 Guest booking detected - using Guest User ID");
+      console.log("🎫 Guest booking detected - using Guest User ID:", GUEST_USER_ID);
+    }
+
+    // 🛡️ SAFETY CHECK: Đảm bảo finalUserId không bao giờ null
+    if (!finalUserId) {
+      console.error("🚨 CRITICAL ERROR: finalUserId is null/undefined");
+      await t.rollback();
+      return res.status(500).json({ 
+        message: "Lỗi hệ thống: không xác định được user ID",
+        error: "USER_ID_NULL",
+        debug: {
+          hasUser: !!req.user,
+          userId: req.user?.id,
+          guestUserId: GUEST_USER_ID
+        }
+      });
     }
 
     /* ────────── 0. Kiểm tra guest & email người đại diện ────────── */

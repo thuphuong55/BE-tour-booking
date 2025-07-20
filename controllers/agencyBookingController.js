@@ -1,4 +1,4 @@
-const { Booking, Tour, Payment, User, DepartureDate, Promotion, sequelize, Agency } = require("../models");
+const { Booking, Tour, Payment, User, DepartureDate, Promotion, sequelize, Agency, Review } = require("../models");
 const { Op } = require("sequelize");
 
 // Helper function to get agency ID from user
@@ -359,19 +359,22 @@ exports.getMyCustomers = async (req, res) => {
 // GET /agency/bookings/reviews - Get reviews for agency's tours
 exports.getMyBookingReviews = async (req, res) => {
   try {
-    const agencyId = await getAgencyId(req.user.id);
-    if (!agencyId) {
-      return res.status(403).json({ error: "Không tìm thấy agency" });
+    // Sử dụng logic tương tự getMyBookings
+    console.log("User ID from token:", req.user.id);
+    const agency = await Agency.findOne({ where: { user_id: req.user.id, status: 'approved' } });
+    console.log("Agency found for reviews:", agency);
+    if (!agency) {
+      return res.status(403).json({ error: 'Chỉ agency đã được duyệt mới có quyền thao tác' });
     }
 
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    const reviews = await require("../models").Review.findAndCountAll({
+    const reviews = await Review.findAndCountAll({
       include: [{
         model: Tour,
         as: 'tour',
-        where: { agency_id: agencyId },
+        where: { agency_id: agency.id },
         attributes: ['id', 'name']
       }, {
         model: User,
@@ -380,7 +383,7 @@ exports.getMyBookingReviews = async (req, res) => {
       }],
       limit: parseInt(limit),
       offset: offset,
-      order: [['created_at', 'DESC']]
+      order: [['review_date', 'DESC']]
     });
 
     res.json({

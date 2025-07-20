@@ -1,5 +1,6 @@
 const { Tour, DepartureDate, TourImage, IncludedService, TourCategory, Hotel, ExcludedService, Itinerary, Location, Promotion, Agency, Destination, User } = require("../models");
 const { paginatedResponse, errorResponse } = require("../utils/responseOptimizer");
+const { smartTransformForUpdate } = require("../utils/tourDataTransformer");
 
 // 🚀 OPTIMIZATION: Predefined field selections
 const TOUR_LIST_FIELDS = [
@@ -165,11 +166,15 @@ const create = async (req, res) => {
       hotel_ids = [],
       category_ids = [],
       included_service_ids = [],
+      excluded_service_ids = [],        // Added excluded services
       selectedIncludedServices = [],
       selectedCategories = [],
+      excludedServices = [],            // Alternative field name
       images = [],
       departureDates = [],
       service = [], // Thêm service từ request
+      destination_id, // ID của destination để auto-populate name
+      location_id,    // ID của location để auto-populate name
       ...tourData
     } = req.body;
 
@@ -178,16 +183,84 @@ const create = async (req, res) => {
     console.log("- service:", service, "Type:", typeof service, "IsArray:", Array.isArray(service));
     console.log("- category_ids:", category_ids);
     console.log("- selectedCategories:", selectedCategories);
+    console.log("- included_service_ids:", included_service_ids);
+    console.log("- excluded_service_ids:", excluded_service_ids);
+    console.log("- excludedServices:", excludedServices);
+    console.log("- destination_id:", destination_id);
+    console.log("- location_id:", location_id);
+    console.log("- departureDates:", departureDates?.length || 0, "dates");
 
-    // Thêm agency_id từ user đăng nhập nếu chưa có
-    if (!tourData.agency_id && req.user) {
-      const userAgency = await Agency.findOne({ where: { user_id: req.user.id } });
-      if (userAgency) {
-        tourData.agency_id = userAgency.id;
+    // 🌍 AUTO-POPULATE destination và location names từ IDs
+    if (destination_id) {
+      console.log("🎯 Auto-populating destination name from ID:", destination_id);
+      const destination = await Destination.findByPk(destination_id);
+      if (destination) {
+        tourData.destination = destination.name;
+        console.log("✅ Destination name set to:", destination.name);
+      } else {
+        return res.status(400).json({
+          message: "Destination ID không tồn tại",
+          destination_id: destination_id
+        });
       }
     }
 
+    if (location_id) {
+      console.log("📍 Auto-populating location name from ID:", location_id);
+      const location = await Location.findByPk(location_id);
+      if (location) {
+        tourData.location = location.name;
+        console.log("✅ Location name set to:", location.name);
+      } else {
+        return res.status(400).json({
+          message: "Location ID không tồn tại",
+          location_id: location_id
+        });
+      }
+    }
+
+    // 🎯 LOGIC PHÂN QUYỀN: Admin vs Agency
+    console.log("👤 User role:", req.user?.role);
+    console.log("🏢 Agency_id from request:", tourData.agency_id);
+
+    if (req.user?.role === 'admin') {
+      // Admin: PHẢI cung cấp agency_id trong request
+      if (!tourData.agency_id) {
+        return res.status(400).json({
+          message: "Admin phải chỉ định agency_id khi tạo tour",
+          required_field: "agency_id"
+        });
+      }
+      console.log("✅ Admin tạo tour cho agency:", tourData.agency_id);
+      
+    } else if (req.user?.role === 'agency') {
+      // Agency: Tự động gán agency_id từ user đăng nhập, IGNORE agency_id từ request
+      const userAgency = await Agency.findOne({ where: { user_id: req.user.id } });
+      if (!userAgency) {
+        return res.status(403).json({
+          message: "Không tìm thấy thông tin agency cho user này"
+        });
+      }
+      tourData.agency_id = userAgency.id; // Force gán agency_id của chính họ
+      console.log("✅ Agency tự tạo tour cho chính mình:", tourData.agency_id);
+    }
+
+    // 🚀 AUTO-APPROVAL LOGIC: Admin vs Agency
+    if (req.user?.role === 'admin') {
+      // Admin: Tour được duyệt ngay, hoạt động luôn
+      if (!tourData.status) {
+        tourData.status = 'Đang hoạt động'; // Auto-approved and active
+      }
+      console.log("🔰 Admin tạo tour - AUTO APPROVED & ACTIVE");
+      
+    } else if (req.user?.role === 'agency') {
+      // Agency: Tour cần duyệt, chưa hoạt động
+      tourData.status = 'Chờ duyệt'; // Pending approval
+      console.log("⏳ Agency tạo tour - PENDING APPROVAL");
+    }
+
     console.log("🎯 Core tour data sẽ lưu:", tourData);
+    console.log("📊 Status:", tourData.status);
 
     // Tạo tour với core data (bao gồm location, destination)
     const tour = await Tour.create(tourData);
@@ -227,6 +300,24 @@ const create = async (req, res) => {
       }
     }
 
+    // 🚫 Xử lý excluded services (cả excludedServices và excluded_service_ids)
+    const excludedServicesToAdd = [...excludedServices, ...excluded_service_ids].filter(Boolean);
+    if (excludedServicesToAdd.length > 0) {
+      console.log("🚫 Thêm excluded services:", excludedServicesToAdd);
+      const existingExcludedServices = await ExcludedService.findAll({
+        where: { id: excludedServicesToAdd }
+      });
+      
+      if (existingExcludedServices.length !== excludedServicesToAdd.length) {
+        console.log('⚠️ Some excluded services not found:', excludedServicesToAdd);
+        console.log('✅ Existing excluded services:', existingExcludedServices.map(s => s.id));
+      }
+      
+      if (existingExcludedServices.length > 0) {
+        await tour.setExcludedServices(existingExcludedServices.map(s => s.id));
+      }
+    }
+
     // Xử lý categories (cả selectedCategories và category_ids)
     const categoriesToAdd = [...selectedCategories, ...category_ids].filter(Boolean);
     if (categoriesToAdd.length > 0) {
@@ -252,12 +343,17 @@ const create = async (req, res) => {
       
       // Kiểm tra hotels có tồn tại không
       const existingHotels = await Hotel.findAll({
-        where: { id_hotel: hotel_ids }
+        where: { id: hotel_ids }
       });
-      console.log("🏨 Found existing hotels:", existingHotels.map(h => ({ id: h.id_hotel, name: h.ten_khach_san })));
+      console.log("🏨 Found existing hotels:", existingHotels.map(h => ({ 
+        id: h.id, 
+        id_hotel_field: h.getDataValue('id_hotel'),
+        name: h.ten_khach_san 
+      })));
       
       if (existingHotels.length > 0) {
-        const hotelIds = existingHotels.map(h => h.id_hotel);
+        // Sử dụng primary key (id) thay vì field mapped
+        const hotelIds = existingHotels.map(h => h.id);
         console.log("🏨 Setting hotels with IDs:", hotelIds);
         await tour.setHotels(hotelIds);
         console.log("🏨 Hotels set successfully");
@@ -298,22 +394,59 @@ const create = async (req, res) => {
 // Cập nhật tour
 const update = async (req, res) => {
   try {
-    console.log("📝 Dữ liệu nhận được khi update tour:", req.body);
+    console.log("📝 Raw data nhận được khi update tour:", JSON.stringify(req.body, null, 2));
+
+    // 🔄 SMART TRANSFORM: Handle both request format and response format
+    const transformedData = smartTransformForUpdate(req.body);
+    console.log("🔄 Transformed data for processing:", Object.keys(transformedData));
 
     const {
       hotel_ids = [],
       category_ids = [],
       included_service_ids = [],
+      excluded_service_ids = [],        // Added excluded services
       selectedIncludedServices = [],
       selectedCategories = [],
+      excludedServices = [],            // Alternative field name
       images,
       departureDates,
+      destination_id, // ID của destination để auto-populate name
+      location_id,    // ID của location để auto-populate name
       ...tourData
-    } = req.body;
+    } = transformedData;
 
     const tour = await Tour.findByPk(req.params.id);
     if (!tour) {
       return res.status(404).json({ message: "Không tìm thấy tour" });
+    }
+
+    // 🌍 AUTO-POPULATE destination và location names từ IDs (cho UPDATE)
+    if (destination_id) {
+      console.log("🎯 Update: Auto-populating destination name from ID:", destination_id);
+      const destination = await Destination.findByPk(destination_id);
+      if (destination) {
+        tourData.destination = destination.name;
+        console.log("✅ Update: Destination name set to:", destination.name);
+      } else {
+        return res.status(400).json({
+          message: "Destination ID không tồn tại",
+          destination_id: destination_id
+        });
+      }
+    }
+
+    if (location_id) {
+      console.log("📍 Update: Auto-populating location name from ID:", location_id);
+      const location = await Location.findByPk(location_id);
+      if (location) {
+        tourData.location = location.name;
+        console.log("✅ Update: Location name set to:", location.name);
+      } else {
+        return res.status(400).json({
+          message: "Location ID không tồn tại",
+          location_id: location_id
+        });
+      }
     }
 
     console.log("🎯 Core tour data sẽ update:", tourData);
@@ -361,6 +494,25 @@ const update = async (req, res) => {
     } else if (servicesToUpdate.length === 0 && (selectedIncludedServices.length === 0 || included_service_ids.length === 0)) {
       // Clear nếu gửi mảng rỗng
       await tour.setIncludedServices([]);
+    }
+
+    // 🚫 Xử lý excluded services (cả excludedServices và excluded_service_ids)
+    const excludedServicesToUpdate = [...excludedServices, ...excluded_service_ids].filter(Boolean);
+    if (excludedServicesToUpdate.length > 0) {
+      console.log("🚫 Cập nhật excluded services:", excludedServicesToUpdate);
+      const existingExcludedServices = await ExcludedService.findAll({
+        where: { id: excludedServicesToUpdate }
+      });
+      
+      if (existingExcludedServices.length !== excludedServicesToUpdate.length) {
+        console.log('⚠️ Some excluded services not found:', excludedServicesToUpdate);
+        console.log('✅ Existing excluded services:', existingExcludedServices.map(s => s.id));
+      }
+      
+      await tour.setExcludedServices(existingExcludedServices.map(s => s.id));
+    } else if (excludedServicesToUpdate.length === 0 && (excludedServices.length === 0 || excluded_service_ids.length === 0)) {
+      // Clear nếu gửi mảng rỗng
+      await tour.setExcludedServices([]);
     }
 
     // Xử lý categories (cả selectedCategories và category_ids)

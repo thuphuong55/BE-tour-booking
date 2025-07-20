@@ -4,8 +4,8 @@ module.exports = (sequelize, DataTypes) => {
     user_id: { type: DataTypes.UUID, allowNull: false },
     tour_id: { 
       type: DataTypes.UUID, 
-      allowNull: false,
-      field: 'tour_schedule_id' // Map to actual database column name
+      allowNull: false
+      // Removed field mapping - use actual tour_id column
     }, 
     departure_date_id: { type: DataTypes.UUID, allowNull: false},
     promotion_id: { type: DataTypes.UUID, allowNull: true },
