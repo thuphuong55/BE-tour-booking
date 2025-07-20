@@ -212,7 +212,7 @@ const getTour = async (req, res) => {
           include: [{ 
             model: User, 
             as: 'user',
-            attributes: ['email', 'name']
+            attributes: ['email', 'name']tại
           }]
         },
         {
@@ -252,7 +252,11 @@ const getTour = async (req, res) => {
         {
           model: Itinerary,
           as: 'itineraries',
-          include: [{ model: Location, as: 'locations' }]
+          include: [{ 
+            model: Location, 
+            as: 'locations',
+            through: { attributes: [] } // Explicitly specify through attributes
+          }]
         }
       ]
     });
