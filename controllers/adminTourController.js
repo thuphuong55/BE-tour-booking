@@ -252,7 +252,7 @@ const getTour = async (req, res) => {
         {
           model: Itinerary,
           as: 'itineraries',
-          include: [{ model: Location, as: 'location' }]
+          include: [{ model: Location, as: 'locations' }]
         }
       ]
     });
