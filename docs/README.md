@@ -18,7 +18,14 @@ Thư mục này chứa tất cả tài liệu API và hướng dẫn của hệ 
 - `ITINERARY_API_DOCS.md` - API lịch trình tour
 - `HOTEL_LOCATION_API_DOCS.md` - API khách sạn và địa điểm
 
-### 💰 Payment & Commission
+### 🎫 Booking System
+- `UNIFIED_BOOKING_API_GUIDE.md` - **⭐ MỚI!** API booking thống nhất cho user & guest
+- `BOOKING_PAYMENT_FLOW.md` - Flow booking và thanh toán chi tiết
+
+### � Notification System
+- `EMAIL_NOTIFICATION_SYSTEM.md` - **⭐ MỚI!** Hệ thống email thông báo tự động
+
+### �💰 Payment & Commission
 - `BOOKING_PAYMENT_FLOW.md` - Flow booking và thanh toán
 - `PAYMENT_ENDPOINTS_STATUS.md` - Trạng thái API thanh toán
 - `COMMISSION_SYSTEM_API_DOCS.md` - API hệ thống hoa hồng

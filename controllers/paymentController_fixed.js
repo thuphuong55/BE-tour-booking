@@ -1,4 +1,4 @@
-const { Payment, Booking, User, Tour, DepartureDate, Promotion, InformationBookingTour } = require('../models');
+const { Payment, Booking, User, Tour, DepartureDate, Promotion } = require('../models');
 
 // Lấy payment theo id
 exports.getById = async (req, res) => {
@@ -30,11 +30,6 @@ exports.getById = async (req, res) => {
               as: 'promotion',
               attributes: ['id', 'code', 'description', 'discount_amount'],
               required: false
-            },
-            {
-              model: InformationBookingTour,
-              as: 'guests',
-              attributes: ['id', 'name', 'email', 'phone', 'cccd']
             }
           ]
         }
@@ -93,11 +88,6 @@ exports.getByOrderId = async (req, res) => {
               as: 'promotion',
               attributes: ['id', 'code', 'description', 'discount_amount'],
               required: false
-            },
-            {
-              model: InformationBookingTour,
-              as: 'guests',
-              attributes: ['id', 'name', 'email', 'phone', 'cccd']
             }
           ]
         }
@@ -211,11 +201,6 @@ exports.getByBookingId = async (req, res) => {
               as: 'promotion',
               attributes: ['id', 'code', 'description', 'discount_amount'],
               required: false
-            },
-            {
-              model: InformationBookingTour,
-              as: 'guests',
-              attributes: ['id', 'name', 'email', 'phone', 'cccd']
             }
           ]
         }
@@ -272,11 +257,6 @@ exports.getAll = async (req, res) => {
               as: 'promotion',
               attributes: ['id', 'code', 'description', 'discount_amount'],
               required: false
-            },
-            {
-              model: InformationBookingTour,
-              as: 'guests',
-              attributes: ['id', 'name', 'email', 'phone', 'cccd']
             }
           ]
         }

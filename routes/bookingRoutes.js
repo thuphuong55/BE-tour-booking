@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bookingController = require("../controllers/bookingController");
 const momoController = require("../controllers/momoController");
+const optionalAuth = require("../middlewares/optionalAuth"); // Optional authentication
 
 router.get("/", async (req, res) => {
   try {
@@ -111,7 +112,11 @@ router.post("/validate-promotion", async (req, res) => {
   }
 });
 
-router.post("/", bookingController.create);
+// ═══════════════════════════════════════════════════════════════════
+// 🎯 MAIN BOOKING ENDPOINT - Hỗ trợ cả User đăng nhập và Guest
+// ═══════════════════════════════════════════════════════════════════
+router.post("/", optionalAuth, bookingController.create);
+
 router.put("/:id", bookingController.update);
 router.delete("/:id", bookingController.delete);
 

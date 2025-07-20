@@ -16,6 +16,7 @@ exports.getTourConfirmation = async (req, res) => {
 const { createMomoPayment } = require('../services/momoService');
 const paymentController = require('./paymentController'); // để cập nhật trạng thái đơn hàng
 const { Tour, Payment, Booking } = require('../models');
+const { sendBookingConfirmationEmail, sendPaymentFailedEmail } = require('../services/emailNotificationService');
 
 exports.createPayment = async (req, res) => {
   try {
@@ -95,11 +96,27 @@ exports.handleIpnCallback = async (req, res) => {
       if (payment) {
         await paymentController.updatePaymentStatus(orderId, 'completed');
         console.log('✅ Updated MoMo payment status to completed');
+        
+        // Gửi email xác nhận booking
+        try {
+          await sendBookingConfirmationEmail(payment.booking_id, "MoMo", orderId);
+          console.log(`✅ Booking confirmation email sent for booking: ${payment.booking_id}`);
+        } catch (emailError) {
+          console.error('❌ Failed to send confirmation email:', emailError);
+        }
       }
     } else {
       if (payment) {
         await paymentController.updatePaymentStatus(orderId, 'failed');
         console.log('❌ Updated MoMo payment status to failed');
+        
+        // Gửi email thông báo thất bại
+        try {
+          await sendPaymentFailedEmail(payment.booking_id, "MoMo", orderId);
+          console.log(`📧 Payment failed email sent for booking: ${payment.booking_id}`);
+        } catch (emailError) {
+          console.error('❌ Failed to send payment failed email:', emailError);
+        }
       }
     }
 

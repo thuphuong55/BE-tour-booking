@@ -31,6 +31,7 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/tours", require("./routes/tourRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoutes"));
+app.use("/api/guest", require("./routes/guestRoutes")); // Guest booking routes
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/locations", require("./routes/locationRoutes"));
 app.use("/api/itineraries", require("./routes/itineraryRoutes"));

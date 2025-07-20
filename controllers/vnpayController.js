@@ -4,6 +4,7 @@ const querystring = require("qs");
 const config = require("../config/vnpay");
 const paymentController = require("./paymentController");
 const { Booking } = require("../models");
+const { sendBookingConfirmationEmail, sendPaymentFailedEmail } = require("../services/emailNotificationService");
 function createHash(data, secret) {
   return crypto.createHmac('sha512', secret)
     .update(Buffer.from(data, 'utf-8'))
@@ -293,9 +294,32 @@ exports.vnpayReturn = async (req, res) => {
 
     if (responseCode === "00") {
       await paymentController.updatePaymentStatus(orderId, "completed");
+      
+      // Lấy bookingId từ orderId (format: bookingId_random)
+      const bookingId = orderId.split('_')[0];
+      
+      // Gửi email xác nhận booking
+      try {
+        await sendBookingConfirmationEmail(bookingId, "VNPay", orderId);
+        console.log(`✅ Booking confirmation email sent for booking: ${bookingId}`);
+      } catch (emailError) {
+        console.error('❌ Failed to send confirmation email:', emailError);
+        // Không fail payment process nếu email fail
+      }
+      
       return res.redirect("http://localhost:3000/payment-success");
     } else {
       await paymentController.updatePaymentStatus(orderId, "failed");
+      
+      // Lấy bookingId từ orderId và gửi email thông báo thất bại
+      const bookingId = orderId.split('_')[0];
+      try {
+        await sendPaymentFailedEmail(bookingId, "VNPay", orderId);
+        console.log(`📧 Payment failed email sent for booking: ${bookingId}`);
+      } catch (emailError) {
+        console.error('❌ Failed to send payment failed email:', emailError);
+      }
+      
       return res.redirect("http://localhost:3000/payment-failed");
     }
   } catch (err) {
