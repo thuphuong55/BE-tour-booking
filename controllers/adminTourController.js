@@ -212,7 +212,7 @@ const getTour = async (req, res) => {
           include: [{ 
             model: User, 
             as: 'user',
-            attributes: ['email', 'name']tại
+            attributes: ['email', 'name']
           }]
         },
         {
@@ -227,7 +227,7 @@ const getTour = async (req, res) => {
         {
           model: Promotion,
           as: 'promotion',
-          attributes: ['id', 'name', 'discount_percentage', 'start_date', 'end_date']
+          attributes: ['id', 'code', 'description', 'discount_amount', 'start_date', 'end_date']
         },
         {
           model: TourCategory,
