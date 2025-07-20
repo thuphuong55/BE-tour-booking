@@ -31,8 +31,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE, 
       allowNull: true,
       comment: 'Thời điểm tính hoa hồng'
-    }
-  
+    },
+    number_of_adults: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    number_of_children: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+
   }, {
     tableName: 'booking',
     timestamps: true,

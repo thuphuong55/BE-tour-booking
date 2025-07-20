@@ -35,7 +35,7 @@ exports.getAgencyByUserId = async (req, res) => {
 const { Agency, User } = require("../models");
 const crypto  = require("crypto");
 const bcrypt  = require("bcryptjs");          
-const sendMail = require("../config/mailer");
+const { sendEmail } = require("../config/mailer");
 
 
 exports.publicRequestAgency = async (req, res) => {
@@ -54,14 +54,24 @@ exports.publicRequestAgency = async (req, res) => {
     // 3. Tạo hoặc lấy user (status = inactive)
     let user = await User.findOne({ where: { email } });
     if (!user) {
-      const username    = email.split("@")[0];
+      // Tạo username unique từ email
+      let baseUsername = email.split("@")[0];
+      let username = baseUsername;
+      let counter = 1;
+      
+      // Kiểm tra và tạo username unique
+      while (await User.findOne({ where: { username } })) {
+        username = `${baseUsername}_${counter}`;
+        counter++;
+      }
+
       const tempPass    = crypto.randomBytes(6).toString("hex");   // mật khẩu tạm
       const passHash    = await bcrypt.hash(tempPass, 10);
       const tempToken   = crypto.randomBytes(32).toString("hex");  // để đặt pass lần đầu
 
       user = await User.create({
         name,
-        username,                 
+        username,               
         email,
         password_hash: passHash,   
         role:    "agency",
@@ -70,7 +80,7 @@ exports.publicRequestAgency = async (req, res) => {
       });
 
       // Gửi link đặt mật khẩu thật cho user (sau khi admin duyệt)
-      console.log(`🔐 User tạm tạo: ${username}/${tempPass}`);
+      console.log(`🔐 User tạm tạo cho agency: ${email} - username: ${username}`);
     }
 
     // 4. Tạo agency (pending)
@@ -87,10 +97,11 @@ exports.publicRequestAgency = async (req, res) => {
     });
 
     // 5. Thông báo admin
-    await sendMail(
+    await sendEmail(
       process.env.ADMIN_EMAIL,
       "Yêu cầu agency mới",
-      `Agency ${name} (${email}) đang chờ duyệt.\nLink duyệt: ${process.env.BASE_URL}/api/agencies/approve/${agency.id}`
+      `<p>Agency <strong>${name}</strong> (${email}) đang chờ duyệt.</p>
+       <p>Link duyệt: <a href="${process.env.BASE_URL}/api/agencies/approve/${agency.id}">Duyệt Agency</a></p>`
     );
 
     return res.status(201).json({
@@ -120,10 +131,11 @@ exports.approveAgency = async (req, res) => {
 
     // 3. Gửi mail kêu đặt mật khẩu
     const resetLink = `${process.env.FRONTEND_URL}/set-password?token=${user.temp_password_token}`;
-    await sendMail(
+    await sendEmail(
       user.email,
       "Agency đã được phê duyệt",
-      `Chúc mừng! Nhấn vào link sau để đặt mật khẩu đầu tiên: ${resetLink}`
+      `<p>Chúc mừng! Agency <strong>${agency.name}</strong> đã được phê duyệt.</p>
+       <p><a href="${resetLink}">Nhấn vào đây để đặt mật khẩu đầu tiên</a></p>`
     );
 
     return res.status(200).json({
@@ -185,5 +197,138 @@ exports.getAgency = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: err.message });
+  }
+};
+
+/* KHÓA/MỞ KHÓA AGENCY (Admin) */
+exports.toggleLockAgency = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // "lock" hoặc "unlock"
+    
+    const agency = await Agency.findByPk(id, { include: "user" });
+    if (!agency) return res.status(404).json({ message: "Không tìm thấy agency" });
+
+    const user = agency.user;
+    if (!user) return res.status(404).json({ message: "Không tìm thấy user của agency" });
+
+    let newStatus, newUserStatus, message;
+    
+    if (action === "lock") {
+      newStatus = "locked";
+      newUserStatus = "inactive"; 
+      message = "Đã khóa agency";
+    } else if (action === "unlock") {
+      newStatus = "approved";
+      newUserStatus = "active";
+      message = "Đã mở khóa agency";
+    } else {
+      return res.status(400).json({ message: "Action phải là 'lock' hoặc 'unlock'" });
+    }
+
+    // Cập nhật agency và user
+    await agency.update({ status: newStatus });
+    await user.update({ status: newUserStatus });
+
+    // Gửi email thông báo cho agency
+    const { sendEmail } = require("../config/mailer");
+    try {
+      if (action === "lock") {
+        await sendEmail(
+          user.email,
+          "Tài khoản Agency bị khóa",
+          `<p>Tài khoản Agency <strong>${agency.name}</strong> đã bị khóa.</p>
+           <p>Vui lòng liên hệ admin để biết thêm chi tiết.</p>`
+        );
+      } else {
+        await sendEmail(
+          user.email,
+          "Tài khoản Agency được mở khóa",
+          `<p>Tài khoản Agency <strong>${agency.name}</strong> đã được mở khóa.</p>
+           <p>Bạn có thể đăng nhập và sử dụng dịch vụ bình thường.</p>`
+        );
+      }
+    } catch (emailError) {
+      console.error("Lỗi gửi email:", emailError);
+      // Không return error vì action chính đã thành công
+    }
+
+    res.json({
+      message,
+      data: { agencyId: agency.id, userId: user.id, status: newStatus }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Lỗi server: " + err.message });
+  }
+};
+
+/* XÓA AGENCY (Admin) */
+exports.deleteAgency = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { permanently = false } = req.body; // Xóa vĩnh viễn hay chỉ đánh dấu
+    
+    const agency = await Agency.findByPk(id, { include: "user" });
+    if (!agency) return res.status(404).json({ message: "Không tìm thấy agency" });
+
+    const user = agency.user;
+
+    if (permanently) {
+      // Xóa vĩnh viễn - cần kiểm tra ràng buộc
+      // Kiểm tra xem agency có tours/bookings không
+      const { Tour, Booking } = require("../models");
+      
+      const tourCount = await Tour.count({ where: { agency_id: id } });
+      const bookingCount = await Booking.count({ 
+        include: [{ 
+          model: Tour, 
+          where: { agency_id: id } 
+        }]
+      });
+
+      if (tourCount > 0 || bookingCount > 0) {
+        return res.status(400).json({ 
+          message: `Không thể xóa agency. Còn ${tourCount} tours và ${bookingCount} bookings liên quan.`,
+          data: { tourCount, bookingCount }
+        });
+      }
+
+      // Xóa agency và user
+      if (user) await user.destroy();
+      await agency.destroy();
+
+      res.json({
+        message: "Đã xóa vĩnh viễn agency và user",
+        data: { agencyId: id, permanently: true }
+      });
+    } else {
+      // Chỉ đánh dấu xóa (soft delete)
+      await agency.update({ status: "deleted" });
+      if (user) await user.update({ status: "inactive" });
+
+      // Gửi email thông báo
+      const { sendEmail } = require("../config/mailer");
+      try {
+        if (user) {
+          await sendEmail(
+            user.email,
+            "Tài khoản Agency bị xóa",
+            `<p>Tài khoản Agency <strong>${agency.name}</strong> đã bị xóa khỏi hệ thống.</p>
+             <p>Vui lòng liên hệ admin nếu cần hỗ trợ.</p>`
+          );
+        }
+      } catch (emailError) {
+        console.error("Lỗi gửi email:", emailError);
+      }
+
+      res.json({
+        message: "Đã đánh dấu xóa agency",
+        data: { agencyId: id, permanently: false }
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Lỗi server: " + err.message });
   }
 };

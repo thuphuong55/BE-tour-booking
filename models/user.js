@@ -5,6 +5,11 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true
     },
+    username: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true
+    },
     password_hash: {
       type: DataTypes.STRING,
       allowNull: false
@@ -25,6 +30,14 @@ module.exports = (sequelize, DataTypes) => {
     },
     temp_password_token: {
       type: DataTypes.STRING,
+      allowNull: true
+    },
+    forgot_password_otp: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    forgot_password_otp_expires: {
+      type: DataTypes.DATE,
       allowNull: true
     },
     name: {

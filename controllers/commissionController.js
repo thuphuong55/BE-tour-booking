@@ -1,5 +1,5 @@
 const CommissionService = require('../services/commissionService');
-const { CommissionSetting, User, TourCategory } = require('../models');
+const { CommissionSetting, User, TourCategory, Commission, Booking, Tour } = require('../models');
 
 const commissionController = {
   /**
@@ -287,6 +287,93 @@ const commissionController = {
         message: 'Lỗi server khi xóa cấu hình hoa hồng',
         error: error.message
       });
+    }
+  },
+
+  // Tạo record hoa hồng mới
+  async create(req, res) {
+    try {
+      const { booking_id, agency_id, amount, rate, status = 'pending' } = req.body;
+      const booking = await Booking.findByPk(booking_id);
+      const agency = await User.findByPk(agency_id);
+      if (!booking || !agency) {
+        return res.status(404).json({ error: 'Booking hoặc agency không tồn tại' });
+      }
+      const commission = await Commission.create({
+        booking_id,
+        agency_id,
+        amount,
+        rate,
+        status
+      });
+      res.status(201).json(commission);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // Lấy danh sách hoa hồng
+  async getAll(req, res) {
+    try {
+      const { agency_id, status } = req.query;
+      const where = {};
+      if (agency_id) where.agency_id = agency_id;
+      if (status) where.status = status;
+      const commissions = await Commission.findAll({ 
+        where, 
+        include: [
+          { model: Booking, as: 'booking' },
+          { model: User, as: 'agency' }
+        ]
+      });
+      res.json(commissions);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // Lấy chi tiết hoa hồng
+  async getById(req, res) {
+    try {
+      const commission = await Commission.findByPk(req.params.id, { 
+        include: [
+          { model: Booking, as: 'booking' },
+          { model: User, as: 'agency' }
+        ]
+      });
+      if (!commission) return res.status(404).json({ error: 'Không tìm thấy commission' });
+      res.json(commission);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // Cập nhật trạng thái hoa hồng
+  async update(req, res) {
+    try {
+      const commission = await Commission.findByPk(req.params.id);
+      if (!commission) return res.status(404).json({ error: 'Không tìm thấy commission' });
+      await commission.update(req.body);
+      res.json(commission);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // Tạo record reversal khi thu hồi hoa hồng do hủy booking
+  async reversal(req, res) {
+    try {
+      const { booking_id, agency_id, amount } = req.body;
+      const reversal = await Commission.create({
+        booking_id,
+        agency_id,
+        amount: -Math.abs(amount),
+        status: 'reversal',
+        note: 'Thu hồi hoa hồng do hủy booking'
+      });
+      res.status(201).json(reversal);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   }
 };

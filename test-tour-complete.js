@@ -40,7 +40,7 @@ async function testGetTourComplete() {
         {
           model: Hotel,
           as: "hotels",
-          attributes: ['id_hotel', 'ten_khach_san', 'ten_phong', 'loai_phong']
+          attributes: ['id_hotel', 'ten_khach_san', 'ten_phong', 'star_rating']
         },
         {
           model: Itinerary,

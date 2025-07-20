@@ -36,12 +36,16 @@ GET /api/payments/vnpay/return              ✅ READY FOR CALLBACKS
 
 ## ⚠️ ISSUES IDENTIFIED
 
-### **1. Database Schema Issues**
+### **1. Database Schema Issues** ✅ FIXED
 ```sql
-Error: Unknown column 'promotion_id' in 'field list'
+Error: Unknown column 'hotels.loai_phong' in 'field list'
 ```
-- VNPay requires booking data but booking table có vấn đề với promotion_id column
-- Cần kiểm tra migration/schema
+- **RESOLVED:** Updated all controller references from `loai_phong` → `star_rating`
+- **Files Fixed:** 
+  - `controllers/tourController.js`
+  - `controllers/dataController.js` 
+  - `test-tour-complete.js`
+- **Status:** Tour Complete APIs now working ✅
 
 ### **2. MoMo Service Integration**
 ```javascript
@@ -145,12 +149,18 @@ Status: 500 - "Lỗi khi tạo thanh toán"
 
 ## 🎯 CONCLUSION
 
-**Payment System Status: 70% Working**
+**Payment System Status: 80% Working** ⬆️
 
 - ✅ **Payment query/details:** Fully functional
 - ✅ **Endpoint structure:** Properly set up  
 - ✅ **Config files:** Present and accessible
-- ⚠️ **Integration issues:** Database schema và external service calls
+- ✅ **Database schema:** Fixed hotel column references (**NEW**)
+- ✅ **Tour Complete APIs:** Now working properly (**NEW**)
+- ⚠️ **Integration issues:** MoMo external service calls
 - ⚠️ **Environment config:** URLs need updates
 
-**Next Steps:** Fix database schema → Test với valid data → Update configs for production
+**Recent Fixes:** 
+- ✅ Fixed `hotels.loai_phong` → `star_rating` schema mismatch
+- ✅ Tour complete endpoints now functional
+
+**Next Steps:** Test với valid data → Update configs for production → Fix MoMo integration

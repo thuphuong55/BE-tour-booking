@@ -18,4 +18,15 @@ router.post('/settings', commissionController.createCommissionSetting);
 router.put('/settings/:id', commissionController.updateCommissionSetting);
 router.delete('/settings/:id', commissionController.deleteCommissionSetting);
 
+// Tạo record hoa hồng mới
+router.post('/', commissionController.create);
+// Lấy danh sách hoa hồng
+router.get('/', commissionController.getAll);
+// Lấy chi tiết hoa hồng
+router.get('/:id', commissionController.getById);
+// Cập nhật trạng thái hoa hồng
+router.put('/:id', commissionController.update);
+// Tạo record reversal khi thu hồi hoa hồng do hủy booking
+router.post('/reversal', commissionController.reversal);
+
 module.exports = router;

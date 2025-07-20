@@ -10,13 +10,36 @@ exports.getById = async (req, res) => {
     res.status(500).json({ message: 'Lỗi lấy thông tin payment theo id' });
   }
 };
-// Lấy thông tin payment và booking theo orderId (MoMo)
+//Lấy thông tin payment và booking theo orderId (MoMo)
 exports.getByOrderId = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const payment = await Payment.findOne({
+    let payment = await Payment.findOne({
       where: { order_id: orderId }
     });
+    
+    // Nếu không tìm thấy payment record nhưng orderId có pattern MoMo
+    if (!payment && orderId.startsWith('MOMO')) {
+      console.log('Detected MoMo payment without database record (legacy flow)');
+      
+      // Tạo mock payment object cho MoMo legacy payments
+      payment = {
+        id: orderId,
+        order_id: orderId,
+        payment_method: 'MoMo',
+        status: 'completed', // Giả sử đã thành công vì đã đến confirmation page
+        amount: null, // Không có trong database
+        payment_date: new Date(),
+        booking_id: null
+      };
+      
+      return res.json({
+        ...payment,
+        booking: null,
+        isLegacyMoMo: true // Flag để frontend biết đây là legacy
+      });
+    }
+    
     if (!payment) {
       return res.status(404).json({ message: 'Không tìm thấy payment với orderId này' });
     }

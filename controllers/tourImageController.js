@@ -62,6 +62,22 @@ const getAll = async (req, res) => {
 const create = async (req, res) => {
   try {
     const { tour_id, image_url, is_main } = req.body;
+    
+    // Validation đầu vào
+    if (!tour_id) {
+      return res.status(400).json({ message: "tour_id là bắt buộc" });
+    }
+    
+    if (!image_url) {
+      return res.status(400).json({ message: "image_url là bắt buộc" });
+    }
+
+    // Validate URL format
+    const urlPattern = /^(https?:\/\/).+/;
+    if (!urlPattern.test(image_url)) {
+      return res.status(400).json({ message: "image_url phải là URL hợp lệ (http/https)" });
+    }
+
     const mainFlag = is_main === true || is_main === "true";
 
     // Kiểm tra tour_id có tồn tại không

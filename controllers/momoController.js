@@ -20,13 +20,29 @@ const { Tour, Payment, Booking } = require('../models');
 exports.createPayment = async (req, res) => {
   try {
     console.log('MoMo createPayment request body:', req.body);
-    const { tourId } = req.body;
+    const { tourId, bookingId } = req.body;
 
-    const tour = await Tour.findByPk(tourId);
+    // Nếu có bookingId, lấy thông tin từ booking
+    let tour, amount, orderInfo;
+    if (bookingId) {
+      const booking = await Booking.findByPk(bookingId, {
+        include: [{ model: Tour, as: 'tour' }]
+      });
+      if (!booking) return res.status(404).json({ message: 'Không tìm thấy booking' });
+      
+      tour = booking.tour;
+      amount = Number(booking.total_price);
+      orderInfo = `Thanh toán booking ${booking.id} - ${tour.name}`;
+    } else {
+      // Legacy: tạo từ tour trực tiếp
+      tour = await Tour.findByPk(tourId);
+      if (!tour) return res.status(404).json({ message: 'Không tìm thấy tour' });
+      
+      amount = Number(tour.price);
+      orderInfo = `Thanh toán tour ${tour.name}`;
+    }
+
     console.log('Found tour:', tour ? tour.id : 'Not found');
-    if (!tour) return res.status(404).json({ message: 'Không tìm thấy tour' });
-
-    const amount = Number(tour.price);
     console.log('Tour amount:', amount);
     if (!amount || amount < 1000) {
       return res.status(400).json({ message: 'Giá tour không hợp lệ để thanh toán MoMo' });
@@ -34,12 +50,25 @@ exports.createPayment = async (req, res) => {
 
     // Sử dụng FE Next.js port 3000 cho redirectUrl
     const redirectUrl = `http://localhost:3000/tour/${tour.id}/confirmation`;
-    const orderInfo = `Thanh toán tour ${tour.name}`;
     console.log('Calling createMomoPayment with:', { orderInfo, amount, redirectUrl });
     const momoRes = await createMomoPayment(orderInfo, amount, redirectUrl);
     console.log('MoMo response:', momoRes);
 
-    // Chỉ trả về response từ MoMo - payment record sẽ được tạo sau khi callback
+    // TẠO PAYMENT RECORD TRONG DATABASE với payment_method = 'MoMo'
+    if (momoRes.resultCode === 0 && bookingId) {
+      try {
+        await paymentController.createPayment({
+          bookingId: bookingId,
+          amount: amount,
+          method: 'MoMo',
+          orderId: momoRes.orderId
+        });
+        console.log('✅ Created MoMo payment record in database');
+      } catch (paymentError) {
+        console.error('❌ Error creating payment record:', paymentError);
+      }
+    }
+
     res.json(momoRes);
   } catch (error) {
     console.error('Error creating MoMo payment:', error);
@@ -50,12 +79,28 @@ exports.createPayment = async (req, res) => {
 exports.handleIpnCallback = async (req, res) => {
   try {
     const { orderId, resultCode } = req.body;
+    console.log('MoMo IPN callback:', { orderId, resultCode });
+
+    // Tìm hoặc tạo payment record với payment_method = 'MoMo'
+    let payment = await Payment.findOne({ where: { order_id: orderId } });
+    
+    if (!payment) {
+      console.log('Payment record not found, this might be a legacy MoMo payment');
+      // Với old flow không có payment record, chỉ update booking nếu có
+      // Tìm booking từ orderId pattern hoặc từ database
+    }
 
     // Nếu thanh toán thành công
     if (resultCode === 0) {
-      await paymentController.updatePaymentStatus(orderId, 'completed');
+      if (payment) {
+        await paymentController.updatePaymentStatus(orderId, 'completed');
+        console.log('✅ Updated MoMo payment status to completed');
+      }
     } else {
-      await paymentController.updatePaymentStatus(orderId, 'failed');
+      if (payment) {
+        await paymentController.updatePaymentStatus(orderId, 'failed');
+        console.log('❌ Updated MoMo payment status to failed');
+      }
     }
 
     res.status(200).send('OK');

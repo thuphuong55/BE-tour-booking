@@ -13,8 +13,14 @@ module.exports = (sequelize, DataTypes) => {
     ten_phong: {
       type: DataTypes.STRING,
     },
-    loai_phong: {
-      type: DataTypes.STRING,
+    star_rating: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+        min: 1,
+        max: 5
+      },
+      comment: 'Số sao khách sạn (1-5 sao)'
     },
     location_id: {
       type: DataTypes.UUID,

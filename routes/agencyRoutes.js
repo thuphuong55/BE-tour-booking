@@ -30,6 +30,13 @@ router.post(
   agencyCtrl.publicRequestAgency
 );
 
+// Test endpoint without captcha validation
+router.post(
+  "/public-request-test",
+  rateLimiter,
+  agencyCtrl.publicRequestAgency
+);
+
 // Admin duyệt agency
 router.put(
   "/approve/:id",
@@ -48,6 +55,20 @@ router.get(
   "/:id",
   protect(["admin", "agency"]),
   agencyCtrl.getAgency
+);
+
+// 5) Admin khóa/mở khóa agency
+router.put(
+  "/toggle-lock/:id",
+  protect(["admin"]),
+  agencyCtrl.toggleLockAgency
+);
+
+// 6) Admin xóa agency 
+router.delete(
+  "/:id",
+  protect(["admin"]),
+  agencyCtrl.deleteAgency
 );
 
 module.exports = router;

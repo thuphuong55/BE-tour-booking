@@ -13,7 +13,10 @@ module.exports = (sequelize, DataTypes) => {
     tax_code: { type: DataTypes.STRING, allowNull: false },
     business_license: { type: DataTypes.TEXT, allowNull: false },
     website: { type: DataTypes.STRING },
-    status: { type: DataTypes.ENUM('pending', 'approved', 'rejected', 'suspended'), defaultValue: 'pending' }
+    status: { 
+      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'suspended', 'locked', 'deleted'), 
+      defaultValue: 'pending' 
+    }
   }, {
     tableName: 'agency',
     timestamps: true,

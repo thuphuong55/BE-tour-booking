@@ -72,10 +72,21 @@ router.post("/validate-promotion", async (req, res) => {
       return res.status(400).json({ error: "Mã khuyến mãi đã hết hạn" });
     }
     
-    // Tính toán giảm giá theo phần trăm
-    const discount_percentage = parseFloat(promotion.discount_amount); // 10.00 = 10%
+    // Tính toán giảm giá - có thể là % hoặc giá cố định
+    const discount_value = parseFloat(promotion.discount_amount);
     const original_price = parseFloat(tour_price);
-    const discount_amount = (original_price * discount_percentage) / 100;
+    
+    let discount_amount;
+    // Nếu discount_amount > 100, coi như giá cố định (VNĐ)
+    // Nếu discount_amount <= 100, coi như phần trăm (%)
+    if (discount_value > 100) {
+      // Giảm giá cố định (VNĐ)
+      discount_amount = Math.min(discount_value, original_price); // Không được giảm quá giá gốc
+    } else {
+      // Giảm giá theo phần trăm (%)
+      discount_amount = (original_price * discount_value) / 100;
+    }
+    
     const final_price = Math.max(0, original_price - discount_amount);
     
     res.json({

@@ -45,6 +45,7 @@ db.IncludedService = require('./includedService')(sequelize, DataTypes);
 db.InformationBookingTour = require('./informationBookingTour')(sequelize, DataTypes);
 db.SearchLog = require('./searchLog')(sequelize, DataTypes);
 db.CommissionSetting = require('./commissionSetting')(sequelize, DataTypes);
+db.Commission = require('./commission')(sequelize, DataTypes);
 
 Object.keys(db).forEach(modelName => {
   if (db[modelName].associate) {

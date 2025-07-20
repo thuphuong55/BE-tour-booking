@@ -53,7 +53,27 @@ app.use("/api/admin/bookings", require("./routes/adminBookingRoutes"));
 app.use("/api/admin/payments", require("./routes/adminPaymentRoutes"));
 app.use("/api/admin/commissions", require("./routes/commissionRoutes"));
 app.use("/api/dashboard/commissions", require("./routes/dashboardCommissionRoutes"));
+app.use('/api/commissions', require('./routes/commissionRoutes'));
 
+// Global error handling middleware for JSON parsing errors
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('📝 JSON Parsing Error:');
+    console.error('URL:', req.method, req.url);
+    console.error('Content-Type:', req.headers['content-type']);
+    console.error('Error:', err.message);
+    console.error('Raw body preview:', err.body?.substring(0, 200) || 'No body');
+    
+    return res.status(400).json({ 
+      message: 'Invalid JSON format',
+      error: 'Request body contains invalid JSON',
+      details: err.message
+    });
+  }
+  
+  // Pass to next error handler
+  next(err);
+});
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

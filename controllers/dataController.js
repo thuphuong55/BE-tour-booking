@@ -30,7 +30,7 @@ const getAllTourCategories = async (req, res) => {
 const getAllHotels = async (req, res) => {
   try {
     const hotels = await Hotel.findAll({
-      attributes: ['id_hotel', 'ten_khach_san', 'ten_phong', 'loai_phong']
+      attributes: ['id_hotel', 'ten_khach_san', 'ten_phong', 'star_rating']
     });
     res.json(hotels);
   } catch (err) {
