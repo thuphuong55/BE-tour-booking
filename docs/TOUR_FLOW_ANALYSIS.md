@@ -105,19 +105,23 @@ Middleware: protect(["agency"]) + ensureAgencyApproved
 
 ### **Step 4: Admin Approval Process**
 ```javascript
-// Admin xem tours cần duyệt
+🚨 CHƯA IMPLEMENT - CHỈ LÀ DESIGN:
+
+// Admin xem tours cần duyệt (MISSING ENDPOINT)
 GET /api/admin/tours?status=Chờ duyệt
 
-// Admin duyệt tour
+// Admin duyệt tour (MISSING ENDPOINT)
 PUT /api/admin/tours/:id/approve
 → status: "Đang hoạt động"
 → Email notification to Agency
 
-// Admin từ chối tour  
+// Admin từ chối tour (MISSING ENDPOINT)
 PUT /api/admin/tours/:id/reject
 Body: { reason: "Thông tin không đầy đủ" }
 → status: "Đã hủy"
 → Email notification to Agency with reason
+
+// HIỆN TẠI: Tours tạo với status "Chờ duyệt" nhưng KHÔNG CÓ cách admin approve
 ```
 
 ---
@@ -130,14 +134,20 @@ GET    /api/tours                    // Lấy tất cả tours (phân quyền th
 GET    /api/tours/:id                // Lấy tour theo ID
 POST   /api/tours                    // Tạo tour mới (Agency only) → status: "Chờ duyệt"
 PUT    /api/tours/:id                // Cập nhật tour (Agency: own tours only)
-DELETE /api/tours/:id                // Xóa tour (Agency: conditional, Admin: conditional)
+DELETE /api/tours/:id                // Xóa tour (Agency: conditional, Admin: KHÔNG CÓ)
 ```
 
-**Agency CRUD Rules:**
-- **READ**: Chỉ xem tours của mình
-- **CREATE**: Tour mới → status "Chờ duyệt"
-- **UPDATE**: Chỉ sửa tours của mình, giới hạn theo status
-- **DELETE**: Chỉ xóa tours không có booking
+**Agency CRUD Rules (HIỆN TẠI):**
+- **READ**: Agency xem tours của mình qua middleware phân quyền
+- **CREATE**: Tour mới → status "Chờ duyệt" (middleware: ensureAgencyApproved)
+- **UPDATE**: Chỉ sửa tours của mình (middleware: ensureAgencyApproved)  
+- **DELETE**: Chỉ xóa tours không có booking (middleware: ensureAgencyApproved)
+
+**Admin CRUD Rules (THIẾU):**
+- **READ**: Có thể xem tất cả tours qua GET /api/tours (nếu có middleware admin)
+- **CREATE**: ❌ Admin không tạo tour
+- **UPDATE**: ❌ THIẾU endpoint admin update tour
+- **DELETE**: ❌ THIẾU endpoint admin delete tour
 
 ### **B. Tour Relations - Individual**
 ```
@@ -168,15 +178,23 @@ GET /api/tours/destination/:destinationId  // Tours theo destination
 
 ### **E. Admin Management Endpoints**
 ```
-# Quản lý duyệt tour
+🚨 CHƯA IMPLEMENT - CẦN BỔ SUNG:
+
+# Quản lý duyệt tour (MISSING)
 GET /api/admin/tours                  // Xem tất cả tours (có filter status)
-PUT /api/admin/tours/:id/approve      // Duyệt tour
+PUT /api/admin/tours/:id/approve      // Duyệt tour  
 PUT /api/admin/tours/:id/reject       // Từ chối tour
 PUT /api/admin/tours/:id/status       // Thay đổi trạng thái tour
 
-# Bulk operations
+# Admin CRUD (MISSING)
+PUT /api/admin/tours/:id              // Admin sửa tour
+DELETE /api/admin/tours/:id           // Admin xóa tour
+
+# Bulk operations (MISSING)
 PUT /api/admin/tours/bulk/status      // Cập nhật trạng thái hàng loạt
 DELETE /api/admin/tours/bulk          // Xóa hàng loạt
+
+# HIỆN TẠI: Admin chỉ có thể xem tours qua GET /api/tours (nếu có quyền admin)
 ```
 
 ### **F. Testing & Debug**
@@ -313,31 +331,47 @@ const adminPermissions = {
 
 ### **🔄 Admin Tour Management Endpoints**
 ```http
-# Duyệt/Từ chối tour
+🚨 CẦN IMPLEMENT - HIỆN TẠI CHƯA CÓ:
+
+# Duyệt/Từ chối tour (MISSING)
 PUT /api/admin/tours/:id/approve     # Duyệt tour
 PUT /api/admin/tours/:id/reject      # Từ chối tour + lý do
 
-# Quản lý trạng thái
+# Quản lý trạng thái (MISSING)
 PUT /api/admin/tours/:id/status      # Đóng/Mở tour
 Body: { status: "Ngừng hoạt động", reason: "Vi phạm quy định" }
 
-# Xem tours cần duyệt  
+# Xem tours cần duyệt (MISSING)
 GET /api/admin/tours?status=Chờ duyệt
 
-# Bulk operations
+# Admin CRUD (MISSING)
+PUT /api/admin/tours/:id             # Admin update tour
+DELETE /api/admin/tours/:id          # Admin delete tour
+
+# Bulk operations (MISSING)
 PUT /api/admin/tours/bulk/status     # Cập nhật hàng loạt
 DELETE /api/admin/tours/bulk         # Xóa hàng loạt
+
+# HIỆN TẠI CHỈ CÓ:
+# - Agency có thể tạo tour → status "Chờ duyệt"
+# - KHÔNG CÓ cách admin approve/reject
+# - Admin có thể xem tours qua GET /api/tours (nếu có quyền)
 ```
 
 ### **📧 Notification System**
 ```javascript
 const notifications = {
-  tour_created: "Admin nhận thông báo có tour mới cần duyệt",
-  tour_approved: "Agency nhận thông báo tour được duyệt", 
-  tour_rejected: "Agency nhận thông báo tour bị từ chối + lý do",
-  tour_suspended: "Agency nhận thông báo tour bị ngừng hoạt động",
-  tour_reactivated: "Agency nhận thông báo tour được mở lại"
+  tour_created: "❌ CHƯA IMPLEMENT - Admin nhận thông báo có tour mới cần duyệt",
+  tour_approved: "❌ CHƯA IMPLEMENT - Agency nhận thông báo tour được duyệt", 
+  tour_rejected: "❌ CHƯA IMPLEMENT - Agency nhận thông báo tour bị từ chối + lý do",
+  tour_suspended: "❌ CHƯA IMPLEMENT - Agency nhận thông báo tour bị ngừng hoạt động",
+  tour_reactivated: "❌ CHƯA IMPLEMENT - Agency nhận thông báo tour được mở lại"
 };
+
+// HIỆN TẠI CHỈ CÓ notification cho agency management:
+// - Agency registration notifications
+// - Agency approval/rejection notifications  
+// - Agency lock/unlock notifications
 ```
 
 ### **🛡️ Business Rules**
@@ -350,16 +384,195 @@ const notifications = {
 
 ---
 
-## 🎯 7. SUMMARY
+## 🎯 7. SUMMARY & IMPLEMENTATION STATUS
 
-**✅ Tour có đầy đủ CRUD operations**
-**✅ Support many-to-many relations với Hotels, Categories, Services**  
-**✅ Complete endpoint trả về full data**
-**✅ Agency-specific endpoints với authentication**
-**✅ Location/Destination search capabilities**
-**✅ Promotion integration**
-**✅ Admin approval workflow**
-**✅ Status management system**
-**✅ Notification system**
+**✅ HOÀN THÀNH:**
+- ✅ Tour có đầy đủ CRUD operations cho Agency
+- ✅ Support many-to-many relations với Hotels, Categories, Services  
+- ✅ Complete endpoint trả về full data
+- ✅ Agency-specific endpoints với authentication
+- ✅ Location/Destination search capabilities
+- ✅ Promotion integration
+- ✅ Agency permission system với middleware
 
-**Flow tạo tour: Auth → Validate → Create → Associate Relations → Admin Approval → Active/Rejected**
+**❌ THIẾU - CẦN IMPLEMENT:**
+- ❌ Admin tour management endpoints (approve/reject/status)
+- ❌ Admin CRUD operations cho tours
+- ❌ Tour approval workflow system
+- ❌ Notification system cho tour events
+- ❌ Bulk operations cho admin
+- ❌ Admin dashboard cho pending tours
+
+**🚨 VẤN ĐỀ HIỆN TẠI:**
+1. **Agency tạo tour → status "Chờ duyệt" nhưng KHÔNG CÓ cách admin approve**
+2. **Tours có thể bị "stuck" ở trạng thái "Chờ duyệt" vĩnh viễn**
+3. **Admin không thể quản lý tours qua API endpoints**
+4. **Thiếu notification system cho tour workflow**
+
+**Flow hiện tại: Agency Create → "Chờ duyệt" → ❌ STUCK (không có admin approval)**
+**Flow cần có: Agency Create → "Chờ duyệt" → Admin Approve → "Đang hoạt động"**
+
+---
+
+## 🔧 8. IMPLEMENTATION GUIDE - CẦN BỔ SUNG
+
+### **A. Admin Tour Controller (cần tạo mới)**
+```javascript
+// File: controllers/adminTourController.js
+const adminTourController = {
+  // Xem tất cả tours với filter
+  getAllTours: async (req, res) => { /* filter by status, agency, etc */ },
+  
+  // Duyệt tour
+  approveTour: async (req, res) => { 
+    // Update status to "Đang hoạt động"
+    // Send email notification to agency
+  },
+  
+  // Từ chối tour  
+  rejectTour: async (req, res) => {
+    // Update status to "Đã hủy"
+    // Send email with reason to agency
+  },
+  
+  // Thay đổi trạng thái tour
+  updateTourStatus: async (req, res) => { /* status management */ },
+  
+  // Admin update tour
+  updateTour: async (req, res) => { /* full admin edit */ },
+  
+  // Admin delete tour
+  deleteTour: async (req, res) => { /* conditional delete */ },
+  
+  // Bulk operations
+  bulkUpdateStatus: async (req, res) => { /* bulk status change */ },
+  bulkDelete: async (req, res) => { /* bulk delete */ }
+};
+```
+
+### **B. Admin Tour Routes (cần tạo mới)**
+```javascript
+// File: routes/adminTourRoutes.js
+const express = require("express");
+const router = express.Router();
+const adminTourController = require("../controllers/adminTourController");
+const protect = require("../middlewares/protect");
+
+// Middleware: chỉ admin mới được access
+router.use(protect(["admin"]));
+
+// Tour management
+router.get("/", adminTourController.getAllTours);
+router.put("/:id/approve", adminTourController.approveTour);
+router.put("/:id/reject", adminTourController.rejectTour);
+router.put("/:id/status", adminTourController.updateTourStatus);
+router.put("/:id", adminTourController.updateTour);
+router.delete("/:id", adminTourController.deleteTour);
+
+// Bulk operations
+router.put("/bulk/status", adminTourController.bulkUpdateStatus);
+router.delete("/bulk", adminTourController.bulkDelete);
+
+module.exports = router;
+```
+
+### **C. App.js Update (cần thêm route)**
+```javascript
+// Thêm vào app.js:
+app.use("/api/admin/tours", require("./routes/adminTourRoutes"));
+```
+
+### **D. Notification Service Extension**
+```javascript
+// Extend config/mailer.js hoặc tạo services/notificationService.js
+const tourNotifications = {
+  sendTourCreatedNotification: async (tourData, adminEmail) => {},
+  sendTourApprovedNotification: async (tourData, agencyEmail) => {},
+  sendTourRejectedNotification: async (tourData, agencyEmail, reason) => {},
+  sendTourStatusChangeNotification: async (tourData, agencyEmail, newStatus) => {}
+};
+```
+
+### **E. Business Logic Updates**
+```javascript
+// Update tourController.create để gửi notification:
+exports.create = async (req, res) => {
+  // ... existing code ...
+  
+  // After tour creation
+  await tourNotifications.sendTourCreatedNotification(tour, process.env.ADMIN_EMAIL);
+  
+  res.status(201).json(tour);
+};
+```
+
+### **F. Database Considerations**
+```sql
+-- Có thể cần thêm columns:
+ALTER TABLE tour ADD COLUMN rejection_reason TEXT;
+ALTER TABLE tour ADD COLUMN approved_at TIMESTAMP;
+ALTER TABLE tour ADD COLUMN approved_by UUID REFERENCES users(id);
+
+-- Index for performance:
+CREATE INDEX idx_tour_status ON tour(status);
+CREATE INDEX idx_tour_agency_status ON tour(agency_id, status);
+```
+
+### **G. Frontend Integration Endpoints**
+```javascript
+// Admin Dashboard cần:
+GET /api/admin/tours?status=Chờ duyệt&page=1&limit=10    // Pending tours
+GET /api/admin/tours/stats                               // Tour statistics
+GET /api/admin/tours?agency_id=xxx                       // Filter by agency
+
+// Agency Dashboard cần:
+GET /api/tours/my-agency?status=Chờ duyệt               // My pending tours
+GET /api/tours/my-agency/stats                          // My tour stats
+```
+
+---
+
+## 🚀 9. IMPLEMENTATION PRIORITY
+
+### **🔥 CRITICAL (Phải làm ngay)**
+1. **Admin Tour Controller & Routes** - Để admin có thể approve tours
+2. **Tour Approval/Rejection Endpoints** - Core workflow
+3. **Basic Email Notifications** - Thông báo approve/reject
+
+### **📋 HIGH (Làm sau critical)**
+4. **Admin Tour Update/Delete** - Admin management features
+5. **Tour Status Management** - Suspend/Reactivate tours
+6. **Enhanced Notifications** - Chi tiết hơn
+
+### **⭐ MEDIUM (Nice to have)**
+7. **Bulk Operations** - Admin efficiency
+8. **Tour Statistics Endpoints** - Dashboard data
+9. **Audit Logging** - Track admin actions
+
+### **🎯 LOW (Future)**
+10. **Advanced Filtering** - Complex search
+11. **Tour Analytics** - Business intelligence
+12. **Automated Rules** - Auto-approve/reject
+
+---
+
+## 📝 10. TESTING CHECKLIST
+
+### **Agency Flow Testing**
+- [ ] Agency tạo tour → status "Chờ duyệt" ✅
+- [ ] Agency sửa tour "Chờ duyệt" ✅  
+- [ ] Agency không sửa được tour "Đang hoạt động" ❌ (cần test)
+- [ ] Agency xóa tour "Chờ duyệt" ✅
+
+### **Admin Flow Testing (sau khi implement)**
+- [ ] Admin xem tất cả tours
+- [ ] Admin approve tour → status "Đang hoạt động"
+- [ ] Admin reject tour → status "Đã hủy"
+- [ ] Admin receive notification khi có tour mới
+- [ ] Agency receive notification khi tour approved/rejected
+
+### **Integration Testing**
+- [ ] End-to-end workflow: Create → Approve → Book → Pay
+- [ ] Permission testing: Agency vs Admin access
+- [ ] Error handling: Invalid IDs, wrong permissions
+- [ ] Performance: Large datasets, concurrent requests

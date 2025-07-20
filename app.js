@@ -14,6 +14,9 @@ app.use(express.json());
 app.use("/api/agency/bookings", require("./routes/agencyBookingRoutes"));
 app.use("/api/agency/payments", require("./routes/agencyPaymentRoutes"));
 
+// Admin Management Routes
+app.use("/api/admin/tours", require("./routes/adminTourRoutes"));
+
 app.use("/api/agencies", require("./routes/agencyRoutes"));
 app.use("/api/agency", require("./routes/agencyRoutes"));
 app.use("/api/auth", require("./routes/authRoutes"));  

@@ -16,12 +16,19 @@ router.get("/test-log", (req, res) => {
   res.json({ message: "Test route OK" });
 });
 
+// Debug route cho location/destination
+router.get("/:id/debug", tourController.debugTourData);
+
+// Debug route cho relations (hotels, services)
+router.get("/:id/debug-relations", tourController.debugTourRelations);
+
 router.get("/", tourController.getAll);
 
-// Lấy tours của agency hiện tại (cần authentication)
+// Lấy tours của agency hiện tại (cần authentication) với phân trang
 router.get("/my-agency", protect(["agency"]), async (req, res) => {
   try {
     const { Tour, DepartureDate, TourImage, Promotion, Agency } = require("../models");
+    const { Op } = require("sequelize");
     
     // Kiểm tra authentication
     if (!req.user) {
@@ -46,8 +53,34 @@ router.get("/my-agency", protect(["agency"]), async (req, res) => {
     
     console.log("Found agency:", agency.id); // Debug log
     
-    const tours = await Tour.findAll({
-      where: { agency_id: agency.id },
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    // Filter parameters
+    const status = req.query.status;
+    const search = req.query.search;
+    
+    // Build where clause
+    let where = { agency_id: agency.id };
+    
+    // Status filter
+    if (status) {
+      where.status = status;
+    }
+    
+    // Search filter
+    if (search) {
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { location: { [Op.iLike]: `%${search}%` } },
+        { destination: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const { count, rows: tours } = await Tour.findAndCountAll({
+      where,
       include: [
         {
           model: DepartureDate,
@@ -72,12 +105,30 @@ router.get("/my-agency", protect(["agency"]), async (req, res) => {
           required: false
         }
       ],
+      limit,
+      offset,
       order: [["created_at", "DESC"]]
     });
     
-    console.log("Found tours for agency:", tours.length); // Debug log
+    const totalPages = Math.ceil(count / limit);
     
-    res.json(tours);
+    console.log(`📊 Agency tours result: ${tours.length}/${count} tours, page ${page}/${totalPages}`);
+    
+    res.json({
+      tours,
+      pagination: {
+        page,
+        limit,
+        total: count,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      },
+      filters: {
+        status,
+        search
+      }
+    });
   } catch (error) {
     console.error("Error fetching agency tours:", error);
     res.status(500).json({ message: "Lỗi server", error: error.message });
@@ -154,6 +205,13 @@ router.put(
   protect(["agency"]),
   ensureAgencyApproved,
   tourController.update
+);
+
+// PATCH endpoint cho cập nhật trạng thái tour
+router.patch(
+  "/:id/status",
+  protect(["admin", "agency"]),
+  tourController.updateStatus
 );
 
 router.delete(
