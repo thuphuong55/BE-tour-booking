@@ -5,34 +5,51 @@ const { Op } = require("sequelize");
 exports.getBookingStats = async (req, res) => {
   try {
     const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
+    const { type, year, month } = req.query; // type: week | month | year
+    let startDate, endDate;
+    const y = year ? parseInt(year) : today.getFullYear();
+    const m = month ? parseInt(month) - 1 : today.getMonth(); // JS month: 0-11
+    if (type === 'week') {
+      let refDate = today;
+      if (year && month) {
+        refDate = new Date(y, m, 1);
+      } else if (year) {
+        refDate = new Date(y, today.getMonth(), today.getDate());
+      } else if (month) {
+        refDate = new Date(today.getFullYear(), m, 1);
+      }
+      const day = refDate.getDay() || 7;
+      startDate = new Date(refDate);
+      startDate.setHours(0,0,0,0);
+      startDate.setDate(refDate.getDate() - day + 1);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 7);
+    } else if (type === 'year') {
+      startDate = new Date(y, 0, 1);
+      endDate = new Date(y + 1, 0, 1);
+    } else { // default: month
+      startDate = new Date(y, m, 1);
+      endDate = new Date(y, m + 1, 1);
+    }
+
     const stats = await Promise.all([
       // Total bookings
       Booking.count(),
-      
-      // This month bookings
+      // Bookings in period
       Booking.count({
         where: {
-          created_at: { [Op.gte]: firstDayOfMonth }
+          created_at: {
+            [Op.gte]: startDate,
+            [Op.lt]: endDate
+          }
         }
       }),
-      
       // Pending bookings
-      Booking.count({
-        where: { status: 'pending' }
-      }),
-      
+      Booking.count({ where: { status: 'pending' } }),
       // Confirmed bookings
-      Booking.count({
-        where: { status: 'confirmed' }
-      }),
-      
+      Booking.count({ where: { status: 'confirmed' } }),
       // Cancelled bookings
-      Booking.count({
-        where: { status: 'cancelled' }
-      }),
-      
+      Booking.count({ where: { status: 'cancelled' } }),
       // Recent bookings
       Booking.findAll({
         limit: 5,
@@ -44,14 +61,16 @@ exports.getBookingStats = async (req, res) => {
       })
     ]);
 
-    res.json({
+    const result = {
       totalBookings: stats[0],
-      thisMonthBookings: stats[1],
+      periodBookings: stats[1],
       pendingBookings: stats[2],
       confirmedBookings: stats[3],
       cancelledBookings: stats[4],
-      recentBookings: stats[5]
-    });
+      recentBookings: stats[5],
+      periodType: type || 'month'
+    };
+    res.json(result);
   } catch (error) {
     console.error("Error getting booking stats:", error);
     res.status(500).json({ error: "Lỗi lấy thống kê booking" });
@@ -62,31 +81,55 @@ exports.getBookingStats = async (req, res) => {
 exports.getRevenueStats = async (req, res) => {
   try {
     const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+    const { type, year, month } = req.query; // type: week | month | year
+    let startDate, endDate;
+    const y = year ? parseInt(year) : today.getFullYear();
+    const m = month ? parseInt(month) - 1 : today.getMonth();
+    if (type === 'week') {
+      let refDate = today;
+      if (year && month) {
+        refDate = new Date(y, m, 1);
+      } else if (year) {
+        refDate = new Date(y, today.getMonth(), today.getDate());
+      } else if (month) {
+        refDate = new Date(today.getFullYear(), m, 1);
+      }
+      const day = refDate.getDay() || 7;
+      startDate = new Date(refDate);
+      startDate.setHours(0,0,0,0);
+      startDate.setDate(refDate.getDate() - day + 1);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 7);
+    } else if (type === 'year') {
+      startDate = new Date(y, 0, 1);
+      endDate = new Date(y + 1, 0, 1);
+    } else {
+      startDate = new Date(y, m, 1);
+      endDate = new Date(y, m + 1, 1);
+    }
 
     const revenueStats = await Promise.all([
       // Total revenue
       Booking.sum('total_price', {
         where: { status: 'confirmed' }
       }),
-      
-      // This month revenue
+      // Revenue in period
       Booking.sum('total_price', {
         where: {
           status: 'confirmed',
-          created_at: { [Op.gte]: firstDayOfMonth }
+          created_at: {
+            [Op.gte]: startDate,
+            [Op.lt]: endDate
+          }
         }
       }),
-      
-      // This year revenue
+      // This year revenue (giữ lại cho biểu đồ)
       Booking.sum('total_price', {
         where: {
           status: 'confirmed',
-          created_at: { [Op.gte]: firstDayOfYear }
+          created_at: { [Op.gte]: new Date(today.getFullYear(), 0, 1) }
         }
       }),
-      
       // Monthly revenue chart data
       sequelize.query(`
         SELECT 
@@ -104,9 +147,10 @@ exports.getRevenueStats = async (req, res) => {
 
     res.json({
       totalRevenue: revenueStats[0] || 0,
-      thisMonthRevenue: revenueStats[1] || 0,
+      periodRevenue: revenueStats[1] || 0,
       thisYearRevenue: revenueStats[2] || 0,
-      monthlyChart: revenueStats[3]
+      monthlyChart: revenueStats[3],
+      periodType: type || 'month'
     });
   } catch (error) {
     console.error("Error getting revenue stats:", error);

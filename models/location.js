@@ -49,6 +49,14 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "location_id",
       as: "hotels"
     });
+
+    // Quan hệ many-to-many với Tour
+    Location.belongsToMany(models.Tour, {
+      through: 'tour_location',
+      foreignKey: 'location_id',
+      otherKey: 'tour_id',
+      as: 'tours'
+    });
   };
 
   return Location;

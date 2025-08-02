@@ -582,6 +582,8 @@ const updateTour = async (req, res) => {
       selectedCategories = [],
       images,
       departureDates,
+      destination_id, // ID của destination để auto-populate name
+      location_id,    // ID của location để auto-populate name
       ...tourData
     } = req.body;
 
@@ -601,6 +603,39 @@ const updateTour = async (req, res) => {
         success: false,
         message: "Tour không tồn tại" 
       });
+    }
+
+    // 🌍 AUTO-POPULATE destination và location names từ IDs (cho ADMIN UPDATE)
+    if (destination_id) {
+      console.log("🎯 Admin Update: Auto-populating destination name from ID:", destination_id);
+      const { Destination } = require("../models");
+      const destination = await Destination.findByPk(destination_id);
+      if (destination) {
+        tourData.destination = destination.name;
+        console.log("✅ Admin Update: Destination name set to:", destination.name);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Destination ID không tồn tại",
+          destination_id: destination_id
+        });
+      }
+    }
+
+    if (location_id) {
+      console.log("📍 Admin Update: Auto-populating location name from ID:", location_id);
+      const { Location } = require("../models");
+      const location = await Location.findByPk(location_id);
+      if (location) {
+        tourData.location = location.name;
+        console.log("✅ Admin Update: Location name set to:", location.name);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Location ID không tồn tại",
+          location_id: location_id
+        });
+      }
     }
 
     console.log("🎯 Admin updating core tour data:", tourData);
@@ -680,6 +715,40 @@ const updateTour = async (req, res) => {
       console.log("🗑️ Hotels cleared by admin");
     }
 
+    // 🚫 Xử lý excluded services - THÊM MỚI
+    const excludedServicesToUpdate = (req.body.excluded_service_ids || []).filter(Boolean);
+    console.log("🚫 ==================== ADMIN EXCLUDED SERVICES DEBUG ====================");
+    console.log("🚫 Raw excluded_service_ids from req.body:", req.body.excluded_service_ids);
+    console.log("🚫 excludedServicesToUpdate:", excludedServicesToUpdate, "length:", excludedServicesToUpdate.length);
+    console.log("🚫 ================================================================");
+    
+    if (excludedServicesToUpdate.length > 0) {
+      console.log("🚫 Admin updating excluded services:", excludedServicesToUpdate);
+      const existingExcludedServices = await require("../models").ExcludedService.findAll({
+        where: { id: excludedServicesToUpdate }
+      });
+      console.log('✅ Found existing excluded services:', existingExcludedServices.map(s => s.id));
+      
+      if (existingExcludedServices.length > 0) {
+        console.log("🔄 About to call tour.setExcludedServices with IDs:", existingExcludedServices.map(s => s.id));
+        await tour.setExcludedServices(existingExcludedServices.map(s => s.id));
+        console.log("🔄 setExcludedServices completed successfully");
+        
+        // Kiểm tra lại database ngay sau khi set
+        const { sequelize } = require('../models');
+        const [checkResult] = await sequelize.query(
+          'SELECT * FROM tour_excluded_service WHERE tour_id = ?',
+          { replacements: [tour.id], type: sequelize.QueryTypes.SELECT }
+        );
+        console.log("🔍 Database check after setExcludedServices:", checkResult.length, "records found");
+        console.log("✅ Excluded services updated by admin");
+      }
+    } else if (excludedServicesToUpdate.length === 0) {
+      // Clear nếu gửi mảng rỗng
+      await tour.setExcludedServices([]);
+      console.log("🗑️ Excluded services cleared by admin");
+    }
+
     // Reload tour với tất cả relationships
     const updatedTour = await Tour.findByPk(tour.id, {
       include: [
@@ -697,6 +766,11 @@ const updateTour = async (req, res) => {
           model: require("../models").IncludedService,
           as: 'includedServices',
           attributes: ['id', 'name']
+        },
+        {
+          model: require("../models").ExcludedService,
+          as: 'excludedServices',
+          attributes: ['id', 'service_name']
         },
         {
           model: require("../models").TourCategory,
@@ -740,10 +814,14 @@ const updateTour = async (req, res) => {
       }
     }
 
+    // Đảm bảo luôn có trường excludedServices (mảng rỗng nếu không có)
+    const tourJson = updatedTour.toJSON();
+    if (!tourJson.excludedServices) tourJson.excludedServices = [];
+
     res.json({
       success: true,
       message: `Tour "${tour.name}" đã được admin cập nhật thành công`,
-      data: updatedTour
+      data: tourJson
     });
     
   } catch (err) {
@@ -916,8 +994,43 @@ const createTour = async (req, res) => {
       selectedCategories = [],
       images = [],
       departureDates = [],
+      destination_id, // ID của destination để auto-populate name
+      location_id,    // ID của location để auto-populate name
       ...tourData
     } = requestBody;
+    
+    // 🌍 AUTO-POPULATE destination và location names từ IDs
+    if (destination_id) {
+      console.log("🎯 Admin: Auto-populating destination name from ID:", destination_id);
+      const { Destination } = require("../models");
+      const destination = await Destination.findByPk(destination_id);
+      if (destination) {
+        tourData.destination = destination.name;
+        console.log("✅ Admin: Destination name set to:", destination.name);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Destination ID không tồn tại",
+          destination_id: destination_id
+        });
+      }
+    }
+
+    if (location_id) {
+      console.log("📍 Admin: Auto-populating location name from ID:", location_id);
+      const { Location } = require("../models");
+      const location = await Location.findByPk(location_id);
+      if (location) {
+        tourData.location = location.name;
+        console.log("✅ Admin: Location name set to:", location.name);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Location ID không tồn tại",
+          location_id: location_id
+        });
+      }
+    }
     
     // Gán agency_id
     tourData.agency_id = agency_id;
@@ -971,7 +1084,37 @@ const createTour = async (req, res) => {
         console.log("✅ Categories added");
       }
     }
+
+    // 🚫 Xử lý excluded services - THÊM MỚI CHO CREATE
+    const excludedServicesToAdd = (requestBody.excluded_service_ids || []).filter(Boolean);
+    console.log("🚫 ==================== ADMIN CREATE EXCLUDED SERVICES DEBUG ====================");
+    console.log("🚫 Raw excluded_service_ids from requestBody:", requestBody.excluded_service_ids);
+    console.log("🚫 excludedServicesToAdd:", excludedServicesToAdd, "length:", excludedServicesToAdd.length);
+    console.log("🚫 ========================================================================");
     
+    if (excludedServicesToAdd.length > 0) {
+      console.log("🚫 Admin creating tour with excluded services:", excludedServicesToAdd);
+      const existingExcludedServices = await require("../models").ExcludedService.findAll({
+        where: { id: excludedServicesToAdd }
+      });
+      console.log('✅ Found existing excluded services:', existingExcludedServices.map(s => s.id));
+      
+      if (existingExcludedServices.length > 0) {
+        console.log("🔄 About to call tour.setExcludedServices with IDs:", existingExcludedServices.map(s => s.id));
+        await tour.setExcludedServices(existingExcludedServices.map(s => s.id));
+        console.log("🔄 setExcludedServices completed successfully for CREATE");
+        
+        // Kiểm tra lại database ngay sau khi set
+        const { sequelize } = require('../models');
+        const [checkResult] = await sequelize.query(
+          'SELECT * FROM tour_excluded_service WHERE tour_id = ?',
+          { replacements: [tour.id], type: sequelize.QueryTypes.SELECT }
+        );
+        console.log("🔍 Database check after CREATE setExcludedServices:", checkResult.length, "records found");
+        console.log("✅ Excluded services added in CREATE by admin");
+      }
+    }
+
     // Xử lý hotels
     if (hotel_ids.length > 0) {
       console.log("🏨 Adding hotels:", hotel_ids);
@@ -1002,6 +1145,11 @@ const createTour = async (req, res) => {
           model: require("../models").IncludedService,
           as: 'includedServices',
           attributes: ['id', 'name']
+        },
+        {
+          model: require("../models").ExcludedService,
+          as: 'excludedServices',
+          attributes: ['id', 'service_name']
         },
         {
           model: require("../models").TourCategory,
@@ -1050,11 +1198,15 @@ const createTour = async (req, res) => {
       }
     }
     
+    // Đảm bảo luôn có trường excludedServices (mảng rỗng nếu không có)
+    const tourJson = fullTour.toJSON();
+    if (!tourJson.excludedServices) tourJson.excludedServices = [];
+    
     res.status(201).json({
       success: true,
       message: `Tour "${tour.name}" đã được tạo thành công cho agency "${agency.name}"`,
       data: {
-        tour: fullTour,
+        tour: tourJson,
         createdBy: req.user.email,
         createdAt: new Date().toISOString()
       }

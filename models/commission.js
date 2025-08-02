@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
 
   Commission.associate = (models) => {
     Commission.belongsTo(models.Booking, { foreignKey: 'booking_id', as: 'booking' });
-    Commission.belongsTo(models.User, { foreignKey: 'agency_id', as: 'agency' });
+    Commission.belongsTo(models.Agency, { foreignKey: 'agency_id', as: 'agency' });
   };
 
   return Commission;

@@ -22,75 +22,83 @@ exports.logSearch = async (req, res) => {
 
 exports.getTopSearchLocations = async (req, res) => {
   try {
-    const [topKeywords] = await sequelize.query(`
-      SELECT keyword, COUNT(*) as count
-      FROM search_logs
-      GROUP BY keyword
-      ORDER BY count DESC
-      LIMIT 5;
-    `);
-
-    const keywords = topKeywords.map(k => k.keyword);
-
+    console.log("🔍 Getting all locations with tours...");
+    
+    // Lấy TẤT CẢ locations thay vì chỉ top search keywords
     const locations = await Location.findAll({
-      where: {
-        [Op.or]: keywords.map(k => ({
-          name: { [Op.like]: `%${k}%` }
-        }))
-      },
-      attributes: ["id", "name", "image_url", "description"]
+      attributes: ["id", "name", "image_url", "description"],
+      order: [['name', 'ASC']] // Sắp xếp theo tên
     });
 
-    // Lấy tours cho mỗi location
-    const locationsWithTours = await Promise.all(
-      locations.map(async (location) => {
-        const tours = await Tour.findAll({
-          where: {
-            [Op.or]: [
-              sequelize.where(
-                sequelize.fn('LOWER', sequelize.col('location')), 
-                'LIKE', 
-                `%${location.name.toLowerCase()}%`
-              ),
-              sequelize.where(
-                sequelize.fn('LOWER', sequelize.col('destination')), 
-                'LIKE', 
-                `%${location.name.toLowerCase()}%`
-              )
-            ]
-          },
-          include: [
-            {
-              model: TourImage,
-              as: 'images',
-              attributes: ['id', 'image_url', 'is_main']
-            },
-            {
-              model: DepartureDate,
-              as: 'departureDates',
-              attributes: ['id', 'departure_date', 'end_date', 'number_of_days', 'number_of_nights']
-            },
-            {
-              model: Promotion,
-              as: 'promotion',
-              attributes: ['id', 'code', 'description', 'discount_amount'],
-              required: false
-            }
-          ],
-          limit: 3, // Giới hạn 3 tours mỗi location
-          order: [['created_at', 'DESC']]
-        });
+    console.log(`📍 Found ${locations.length} total locations`);
 
-        return {
+    // Lấy tours cho mỗi location và chỉ giữ location có ít nhất 1 tour
+    const locationsWithTours = [];
+    for (const location of locations) {
+      const tours = await Tour.findAll({
+        where: {
+          [Op.and]: [
+            // Lấy tours đang hoạt động HOẶC status rỗng/null (có thể là tours chưa set status)
+            {
+              [Op.or]: [
+                { status: 'Đang hoạt động' },
+                { status: '' },
+                { status: null }
+              ]
+            },
+            // Match location hoặc destination
+            {
+              [Op.or]: [
+                sequelize.where(
+                  sequelize.fn('LOWER', sequelize.col('location')), 
+                  'LIKE', 
+                  `%${location.name.toLowerCase()}%`
+                ),
+                sequelize.where(
+                  sequelize.fn('LOWER', sequelize.col('destination')), 
+                  'LIKE', 
+                  `%${location.name.toLowerCase()}%`
+                )
+              ]
+            }
+          ]
+        },
+        include: [
+          {
+            model: TourImage,
+            as: 'images',
+            attributes: ['id', 'image_url', 'is_main']
+          },
+          {
+            model: DepartureDate,
+            as: 'departureDates',
+            attributes: ['id', 'departure_date', 'end_date', 'number_of_days', 'number_of_nights']
+          },
+          {
+            model: Promotion,
+            as: 'promotion',
+            attributes: ['id', 'code', 'description', 'discount_amount'],
+            required: false
+          }
+        ],
+        limit: 10, // Tăng từ 5 lên 10 tours mỗi location để đảm bảo lấy đủ
+        order: [['created_at', 'DESC']]
+      });
+
+      // Chỉ thêm location nếu có ít nhất 1 tour
+      if (tours && tours.length > 0) {
+        locationsWithTours.push({
           ...location.toJSON(),
           tours: tours
-        };
-      })
-    );
+        });
+      }
+    }
+
+    console.log(`✅ Final result: ${locationsWithTours.length} locations with tours`);
 
     res.json({ locations: locationsWithTours });
   } catch (err) {
-    console.error("Lỗi lấy top tỉnh thành nổi bật:", err);
+    console.error("❌ Lỗi lấy top tỉnh thành nổi bật:", err);
     res.status(500).json({ message: "Lỗi server" });
   }
 };
@@ -123,52 +131,54 @@ exports.getTopSearchDestinations = async (req, res) => {
       ]
     });
 
-    // Lấy tours cho mỗi destination
-    const destinationsWithTours = await Promise.all(
-      destinations.map(async (destination) => {
-        const tours = await Tour.findAll({
-          where: {
-            [Op.or]: [
-              sequelize.where(
-                sequelize.fn('LOWER', sequelize.col('location')), 
-                'LIKE', 
-                `%${destination.name.toLowerCase()}%`
-              ),
-              sequelize.where(
-                sequelize.fn('LOWER', sequelize.col('destination')), 
-                'LIKE', 
-                `%${destination.name.toLowerCase()}%`
-              )
-            ]
+    // Lấy tours cho mỗi destination và chỉ giữ destination có ít nhất 1 tour
+    const destinationsWithTours = [];
+    for (const destination of destinations) {
+      const tours = await Tour.findAll({
+        where: {
+          [Op.or]: [
+            sequelize.where(
+              sequelize.fn('LOWER', sequelize.col('location')), 
+              'LIKE', 
+              `%${destination.name.toLowerCase()}%`
+            ),
+            sequelize.where(
+              sequelize.fn('LOWER', sequelize.col('destination')), 
+              'LIKE', 
+              `%${destination.name.toLowerCase()}%`
+            )
+          ]
+        },
+        include: [
+          {
+            model: TourImage,
+            as: 'images',
+            attributes: ['id', 'image_url', 'is_main']
           },
-          include: [
-            {
-              model: TourImage,
-              as: 'images',
-              attributes: ['id', 'image_url', 'is_main']
-            },
-            {
-              model: DepartureDate,
-              as: 'departureDates',
-              attributes: ['id', 'departure_date', 'end_date', 'number_of_days', 'number_of_nights']
-            },
-            {
-              model: Promotion,
-              as: 'promotion',
-              attributes: ['id', 'code', 'description', 'discount_amount'],
-              required: false
-            }
-          ],
-          limit: 3, // Giới hạn 3 tours mỗi destination
-          order: [['created_at', 'DESC']]
-        });
+          {
+            model: DepartureDate,
+            as: 'departureDates',
+            attributes: ['id', 'departure_date', 'end_date', 'number_of_days', 'number_of_nights']
+          },
+          {
+            model: Promotion,
+            as: 'promotion',
+            attributes: ['id', 'code', 'description', 'discount_amount'],
+            required: false
+          }
+        ],
+        limit: 3,
+        order: [['created_at', 'DESC']]
+      });
 
-        return {
+      // Chỉ thêm destination nếu có ít nhất 1 tour
+      if (tours && tours.length > 0) {
+        destinationsWithTours.push({
           ...destination.toJSON(),
           tours: tours
-        };
-      })
-    );
+        });
+      }
+    }
 
     res.json({ destinations: destinationsWithTours });
   } catch (err) {

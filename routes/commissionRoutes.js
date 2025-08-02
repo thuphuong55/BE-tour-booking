@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const commissionController = require('../controllers/commissionController');
-const { protect, ensureAdmin } = require('../middlewares/auth');
+const { protect } = require('../middlewares/auth');
 
 // Áp dụng middleware xác thực admin cho tất cả routes
-router.use(protect);
-router.use(ensureAdmin);
+router.use(protect(['admin']));
 
 // Commission calculation routes
 router.post('/calculate/:bookingId', commissionController.calculateBookingCommission);

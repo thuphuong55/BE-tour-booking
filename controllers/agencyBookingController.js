@@ -9,7 +9,6 @@ const getAgencyId = async (userId) => {
   return agency?.id;
 };
 
-console.log("AgencyBookingController file loaded");
 
 // GET /agency/bookings/stats - Agency booking statistics
 exports.getMyBookingStats = async (req, res) => {

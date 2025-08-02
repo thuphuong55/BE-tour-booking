@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const agencyBookingController = require("../controllers/agencyBookingController");
-const { protect } = require("../middlewares/authMiddleware");
+const { protect } = require("../middlewares/auth");
 const ensureAgencyApproved = require("../middlewares/ensureAgencyApproved");
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -26,6 +26,5 @@ router.get("/test-middleware", protect(['agency']), asyncHandler(ensureAgencyApp
   res.json({ message: "Middleware chạy thành công" });
 });
 
-console.log("Đang gắn middleware protect và ensureAgencyApproved");
 
 module.exports = router;

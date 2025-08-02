@@ -42,6 +42,7 @@ router.get("/", async (req, res) => {
   }
 });
 router.get("/:id", bookingController.getById);
+router.get("/:bookingId/with-payment", bookingController.getBookingWithPayment); // 🆕 Get booking with payment data
 
 // Validate promotion code endpoint
 router.post("/validate-promotion", async (req, res) => {
@@ -116,6 +117,10 @@ router.post("/validate-promotion", async (req, res) => {
 // 🎯 MAIN BOOKING ENDPOINT - Hỗ trợ cả User đăng nhập và Guest
 // ═══════════════════════════════════════════════════════════════════
 router.post("/", optionalAuth, bookingController.create);
+
+// Cancel booking endpoints - support both POST and PUT
+router.post("/:id/cancel", optionalAuth, require("../controllers/cancelBookingController").cancelBooking);
+router.put("/:id/cancel", optionalAuth, require("../controllers/cancelBookingController").cancelBooking);
 
 router.put("/:id", bookingController.update);
 router.delete("/:id", bookingController.delete);

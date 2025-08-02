@@ -1,7 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const promotionController = require("../controllers/promotionController");
+const newsletterController = require("../controllers/promotionNewsletterController");
+const { protect } = require("../middlewares/auth");
 
+// Public endpoints - Không cần authentication
 router.get("/", promotionController.getAll);
 
 // Lấy promotions đang hoạt động
@@ -48,8 +51,47 @@ router.get("/code/:code", async (req, res) => {
 });
 
 router.get("/:id", promotionController.getById);
-router.post("/", promotionController.create);
-router.put("/:id", promotionController.update);
-router.delete("/:id", promotionController.delete);
+
+// 🔒 PROTECTED ENDPOINTS - Admin và Agency có thể tạo/sửa/xóa mã giảm giá
+router.post("/", protect(["admin", "agency"]), promotionController.create);
+router.put("/:id", protect(["admin", "agency"]), promotionController.update);
+router.delete("/:id", protect(["admin", "agency"]), promotionController.delete);
+
+// 🏢 AGENCY ENDPOINTS - Agency lấy promotions của họ
+router.get("/my/promotions", protect(["agency"]), async (req, res) => {
+  try {
+    const { Promotion } = require("../models");
+    const agencyId = req.user.id;
+    const { page = 1, limit = 20, status } = req.query;
+    const offset = (page - 1) * limit;
+    
+    const whereClause = { agency_id: agencyId };
+    if (status) whereClause.status = status;
+
+    const promotions = await Promotion.findAndCountAll({
+      where: whereClause,
+      limit: parseInt(limit),
+      offset: offset,
+      order: [['created_at', 'DESC']]
+    });
+
+    res.json({
+      promotions: promotions.rows,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(promotions.count / limit),
+        totalPromotions: promotions.count,
+        limit: parseInt(limit)
+      }
+    });
+  } catch (error) {
+    console.error("Error getting agency promotions:", error);
+    res.status(500).json({ error: "Lỗi lấy danh sách mã giảm giá của agency" });
+  }
+});
+
+// 📧 NEWSLETTER ENDPOINTS - Admin và Agency gửi mã giảm giá cho users
+router.post("/send-newsletter", protect(["admin", "agency"]), newsletterController.sendPromotionNewsletter);
+router.post("/send-to-user", protect(["admin", "agency"]), newsletterController.sendPromotionToUser);
 
 module.exports = router;

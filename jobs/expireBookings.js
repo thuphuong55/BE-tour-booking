@@ -20,16 +20,16 @@ module.exports = async function expireBookingsJob() {
     );
 
     const duration = Date.now() - startTime;
-    console.log(`[Cron] ✅ Đã cập nhật ${expired[0]} booking hết hạn (${duration}ms)`);
+   
     
     // Warning nếu job chạy quá lâu
     if (duration > 5000) {
-      console.warn(`[Cron] ⚠️ Job chạy chậm: ${duration}ms - cần optimize`);
+
     }
     
     return expired[0];
   } catch (error) {
-    console.error(`[Cron] ❌ Lỗi expire bookings:`, error.message);
+
     // Không throw error để tránh crash app
     return 0;
   }

@@ -66,6 +66,11 @@ module.exports = (sequelize, DataTypes) => {
     foreignKey: 'user_id',
     as: 'agency'
   });
+  // Thêm association với Booking
+  User.hasMany(models.Booking, {
+    foreignKey: 'user_id',
+    as: 'bookings'
+  });
 };
 
   return User;

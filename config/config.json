@@ -2,7 +2,7 @@
   "development": {
     "username": "root",
     "password": null,
-    "database": "tour_booking_db",
+    "database": "tour_booking",
     "host": "127.0.0.1",
     "dialect": "mysql"
   },

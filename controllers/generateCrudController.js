@@ -43,11 +43,38 @@ module.exports = (Model, include = []) => {
             });
           }
         }
+
+        // 🔐 Special handling for User model - hash password
+        let dataToCreate = { ...req.body };
         
-        const row = await Model.create(req.body);
-        res.status(201).json(row);
+        if (Model.name === 'User' && req.body.password) {
+          const bcrypt = require('bcrypt');
+          console.log('🔐 Hashing password for User creation...');
+          
+          // Hash password and remove plain password from data
+          const salt = await bcrypt.genSalt(10);
+          dataToCreate.password_hash = await bcrypt.hash(req.body.password, salt);
+          delete dataToCreate.password; // Remove plain password
+          
+          console.log('✅ Password hashed successfully');
+        } else if (Model.name === 'User' && !req.body.password && !req.body.password_hash) {
+          return res.status(400).json({ 
+            error: "Password is required",
+            message: "Vui lòng cung cấp mật khẩu cho user mới"
+          });
+        }
+        
+        const row = await Model.create(dataToCreate);
+        
+        // Don't return password_hash in response
+        if (Model.name === 'User') {
+          const { password_hash, ...userResponse } = row.toJSON();
+          res.status(201).json(userResponse);
+        } else {
+          res.status(201).json(row);
+        }
       } catch (err) {
-        console.error(err);
+        console.error('❌ Create error:', err);
         res.status(500).json({ error: err.message });
       }
     },

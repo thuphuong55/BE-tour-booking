@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const tourController = require("../controllers/tourController");
-const protect = require("../middlewares/protect");
+const { protect } = require("../middlewares/auth");
 const ensureAgencyApproved = require("../middlewares/ensureAgencyApproved");
 
 // Endpoint lấy tour theo location qua itinerary
@@ -166,9 +166,6 @@ router.get("/with-promotions", async (req, res) => {
 });
 
 router.get("/:id", tourController.getById);
-
-// ⚠️ REMOVED DUPLICATE: router.post("/", tourController.create);
-// The correct POST route with middleware is defined below
 
 router.put("/:id", tourController.update);
 router.delete("/:id", tourController.delete);

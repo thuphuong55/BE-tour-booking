@@ -1,4 +1,4 @@
-const { Payment, Booking, User, Tour, DepartureDate, Promotion, InformationBookingTour } = require('../models');
+const { Payment, Booking, User, Tour, DepartureDate, Promotion, InformationBookingTour, Agency } = require('../models');
 
 // Lấy payment theo id
 exports.getById = async (req, res) => {
@@ -18,7 +18,14 @@ exports.getById = async (req, res) => {
             {
               model: Tour,
               as: 'tour',
-              attributes: ['id', 'name', 'destination', 'price']
+              attributes: ['id', 'name', 'destination', 'price', 'agency_id'],
+              include: [
+                {
+                  model: Agency,
+                  as: 'agency',
+                  attributes: ['id', 'name']
+                }
+              ]
             },
             {
               model: DepartureDate,
@@ -81,7 +88,14 @@ exports.getByOrderId = async (req, res) => {
             {
               model: Tour,
               as: 'tour',
-              attributes: ['id', 'name', 'destination', 'price']
+              attributes: ['id', 'name', 'destination', 'price', 'agency_id'],
+              include: [
+                {
+                  model: Agency,
+                  as: 'agency',
+                  attributes: ['id', 'name']
+                }
+              ]
             },
             {
               model: DepartureDate,
@@ -163,20 +177,35 @@ exports.createPayment = async ({ bookingId, amount, method, orderId }) => {
 };
 
 //Dùng trong IPN từ MoMo
+const { updateBookingSummary } = require('../utils/bookingSummary');
 exports.updatePaymentStatus = async (orderId, newStatus) => {
   const payment = await Payment.findOne({ where: { order_id: orderId } });
   if (!payment) throw new Error('Không tìm thấy thanh toán');
-
+  console.log(`Updating payment status for orderId ${orderId} to ${newStatus}`);
   payment.status = newStatus;
   await payment.save();
-
-  //Nếu thanh toán thành công → cập nhật trạng thái booking
+console.log(`✅ Payment status updated: ${payment.status} and newStatus=${newStatus}`);
+  //Nếu thanh toán thành công → cập nhật trạng thái booking và booking_summary
   if (newStatus === 'completed') {
-    await Booking.update(
-      { status: 'confirmed' },
-      { where: { id: payment.booking_id } }
-    );
+  const affectedRows = await Booking.update(
+  { status: 'confirmed' },
+  { where: { id: payment.booking_id } }
+);
+console.log(`✅ Booking status updated to confirmed for booking_id=${affectedRows}`);
+  console.log(`✅ Booking status updated to confirmed for booking_id=${payment.booking_id}`);
+
+    if (affectedRows) {
+      // Cập nhật booking_summary
+      await updateBookingSummary(payment.booking_id);
+    } else {
+      // Nếu không lấy được booking từ update, thử lấy lại từ DB
+      const bookingInstance = await Booking.findByPk(payment.booking_id);
+      if (bookingInstance) {
+        await updateBookingSummary(bookingInstance);
+      }
+    }
   }
+
   return payment;
 };
 

@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const adminTourController = require("../controllers/adminTourController");
-const protect = require("../middlewares/protect");
+const { protect } = require("../middlewares/auth");
 
 // Middleware: chỉ admin mới được access
 router.use(protect(["admin"]));

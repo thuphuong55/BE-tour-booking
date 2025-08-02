@@ -4,7 +4,7 @@ const detectPort = require('detect-port').default;
 const cron = require("node-cron");
 const expireBookingsJob = require("./jobs/expireBookings");
 
-const DEFAULT_PORT = process.env.PORT || 5001;
+const DEFAULT_PORT = 5000; // Force port 5000
 
 // Performance optimization: Pre-configure server settings
 const serverOptions = {
@@ -16,11 +16,10 @@ const serverOptions = {
 };
 
 detectPort(DEFAULT_PORT).then(port => {
-  const server = app.listen(port, () => {
-    console.log(`🚀 Optimized Server running on port ${port}`);
-    console.log(`📊 Performance monitoring enabled`);
-    console.log(`🔧 Connection pooling: Active`);
-    console.log(`⚡ Response compression: Enabled`);
+  // Force sử dụng DEFAULT_PORT thay vì port được detect
+  const actualPort = DEFAULT_PORT;
+  const server = app.listen(actualPort, () => {
+    console.log(`Running on port ${actualPort}`);
   });
 
   // Apply server optimizations

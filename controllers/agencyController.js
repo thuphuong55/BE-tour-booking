@@ -9,6 +9,10 @@ exports.getAgencyByUserId = async (req, res) => {
     const { userId } = req.params;
     const { Op } = require('sequelize');
     console.log('userId param:', userId, typeof userId);
+    // So sánh từng user_id trong bảng với userId param
+    allUserIds.forEach(u => {
+      console.log(`[DEBUG] So sánh userId param (${userId}) === user_id trong bảng (${u.user_id}):`, userId === u.user_id, '| typeof:', typeof u.user_id);
+    });
     // Sequelize query
     const agency = await Agency.findOne({ where: { user_id: { [Op.eq]: String(userId) } } });
     console.log('agency found (Sequelize):', agency);
@@ -21,6 +25,7 @@ exports.getAgencyByUserId = async (req, res) => {
     console.log('Current DB:', rows[0].db);
 
     if (!agency && (!results || results.length === 0)) {
+      console.log('[DEBUG] Không tìm thấy agency với user_id này:', userId);
       return res.status(404).json({ message: 'Không tìm thấy agency với user_id này' });
     }
     res.json({
@@ -28,6 +33,7 @@ exports.getAgencyByUserId = async (req, res) => {
       agencyRaw: results
     });
   } catch (err) {
+    console.error('[DEBUG] Lỗi server khi getAgencyByUserId:', err);
     res.status(500).json({ message: 'Lỗi server', error: err.message });
   }
 };
@@ -36,6 +42,163 @@ const { Agency, User } = require("../models");
 const crypto  = require("crypto");
 const bcrypt  = require("bcryptjs");          
 const { sendEmail } = require("../config/mailer");
+
+// ➕ ADMIN TẠO TRỰC TIẾP AGENCY
+exports.adminCreateAgency = async (req, res) => {
+  try {
+    const { name, username: userProvidedUsername, email, phone, address, tax_code, business_license, website, password } = req.body;
+    
+    // Support cả name và username field
+    const agencyName = name || userProvidedUsername;
+    
+    console.log("🔰 Admin creating agency with data:", { 
+      agencyName, 
+      email, 
+      phone,
+      originalRequest: { name, username: userProvidedUsername }
+    });
+    
+    // Validate required fields
+    if (!agencyName || !email || !phone || !password) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Thiếu thông tin bắt buộc: name/username, email, phone, password",
+        received: { agencyName, email, phone, password: password ? "***" : "missing" }
+      });
+    }
+
+    // Check email đã tồn tại
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Email đã được sử dụng trong hệ thống" 
+      });
+    }
+
+    const existingAgency = await Agency.findOne({ where: { email } });
+    if (existingAgency) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Email agency đã tồn tại" 
+      });
+    }
+
+    // Tạo username unique từ email
+    let baseUsername = email.split("@")[0];
+    let username = baseUsername;
+    let counter = 1;
+    
+    while (await User.findOne({ where: { username } })) {
+      username = `${baseUsername}_${counter}`;
+      counter++;
+    }
+
+    // Hash password với validation
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ 
+        success: false,
+        message: "Password không hợp lệ" 
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+    
+    // Validate hashed password
+    if (!hashedPassword) {
+      throw new Error("Password hashing failed");
+    }
+    
+    console.log("✅ Password hashed successfully");
+
+    // Tạo user với status active (admin tạo = auto approved)
+    const user = await User.create({
+      name: agencyName,
+      username,
+      email,
+      password_hash: hashedPassword,
+      role: "agency",
+      status: "active", // Admin tạo = auto active
+      isVerified: true
+    });
+
+    // Tạo agency với status approved (admin tạo = auto approved)
+    const agency = await Agency.create({
+      name: agencyName,
+      user_id: user.id,
+      email,
+      phone,
+      address: address || "",
+      tax_code: tax_code || "",
+      business_license: business_license || "",
+      website: website || null,
+      status: "approved" // Admin tạo = auto approved
+    });
+
+    console.log(`✅ Admin created agency: ${agency.name} (${agency.id})`);
+
+    // Gửi email thông báo cho agency
+    try {
+      await sendEmail(
+        user.email,
+        "🎉 Tài khoản Agency đã được tạo bởi Admin",
+        `
+        <h2>🎉 Chào mừng bạn đến với hệ thống!</h2>
+        <p>Tài khoản Agency <strong>${agency.name}</strong> đã được Admin tạo thành công.</p>
+        
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3>📋 Thông tin đăng nhập:</h3>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Mật khẩu:</strong> ${password}</p>
+          <p><strong>Username:</strong> ${username}</p>
+        </div>
+        
+        <p><strong>Trạng thái:</strong> Đã duyệt và kích hoạt</p>
+        <p><strong>Quyền:</strong> Có thể tạo và quản lý tours ngay lập tức</p>
+        
+        <p>🔐 <em>Vui lòng đổi mật khẩu sau khi đăng nhập lần đầu để bảo mật.</em></p>
+        <p>📞 Liên hệ admin nếu cần hỗ trợ.</p>
+        `
+      );
+      console.log("📧 Welcome email sent to agency");
+    } catch (emailError) {
+      console.error("📧 Email sending failed:", emailError);
+      // Không fail request vì agency đã tạo thành công
+    }
+
+    // Reload với user info
+    const fullAgency = await Agency.findByPk(agency.id, {
+      include: [{ 
+        model: User, 
+        as: 'user',
+        attributes: ['id', 'name', 'email', 'username', 'status', 'role']
+      }]
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Agency "${name}" đã được tạo thành công và tự động duyệt`,
+      data: {
+        agency: fullAgency,
+        credentials: {
+          email,
+          username,
+          tempPassword: password
+        },
+        createdBy: req.user.email,
+        createdAt: new Date().toISOString()
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Error in admin createAgency:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Lỗi khi tạo agency",
+      error: err.message 
+    });
+  }
+};
 
 
 exports.publicRequestAgency = async (req, res) => {

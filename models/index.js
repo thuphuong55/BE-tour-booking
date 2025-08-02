@@ -28,6 +28,7 @@ db.Review = require('./review')(sequelize, DataTypes);
 db.TourImage = require('./tourImage')(sequelize, DataTypes);
 db.Payment = require('./payment')(sequelize, DataTypes);
 db.FAQ = require('./faq')(sequelize, DataTypes);
+db.Refund = require('./refund')(sequelize, DataTypes);
 db.Promotion = require('./promotion')(sequelize, DataTypes);
 db.TourCategory = require('./tourCategory')(sequelize, DataTypes);
 db.TourTourCategory = require('./tourTourCategory')(sequelize, DataTypes);
@@ -46,6 +47,7 @@ db.InformationBookingTour = require('./informationBookingTour')(sequelize, DataT
 db.SearchLog = require('./searchLog')(sequelize, DataTypes);
 db.CommissionSetting = require('./commissionSetting')(sequelize, DataTypes);
 db.Commission = require('./commission')(sequelize, DataTypes);
+db.Refund = require('./refund')(sequelize, DataTypes);
 
 Object.keys(db).forEach(modelName => {
   if (db[modelName].associate) {

@@ -6,7 +6,7 @@ const optionalAuth = async (req, res, next) => {
   try {
     // Lấy token từ header
     const authHeader = req.headers.authorization;
-    
+    console.log("🔍 Optional auth header:", authHeader);
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       // Không có token → tiếp tục như guest
       console.log("🎫 No token provided - proceeding as guest");

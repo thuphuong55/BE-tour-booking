@@ -1,23 +1,25 @@
-const { Booking, Tour, DepartureDate, InformationBookingTour, User, Promotion, sequelize } = require("../models");
+const { Booking, Tour, DepartureDate, InformationBookingTour, User, Promotion, Payment, sequelize } = require("../models");
 const generateCrudController = require("./generateCrudController");
+const tourController = require("./tourController");
 const { Op } = require("sequelize");
-const { sendEmail } = require("../config/mailer");
+const { sendEmail, sendBookingEmail } = require("../config/mailer");
 
 // ID của guest user cố định
 const GUEST_USER_ID = "3ca8bb89-a406-4deb-96a7-dab4d9be3cc1";
 
 // ─────────────────────────────────────────────
-//  Hàm CREATE Booking - Hỗ trợ cả User đăng nhập và Guest
+//  Hàm CREATE Booking - YÊU CẦU THANH TOÁN NGAY
 // ─────────────────────────────────────────────
 const create = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    // 🔍 DEBUG: Log incoming request
-    console.log('📋 BOOKING REQUEST DEBUG:');
-    console.log('- Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('- Body:', JSON.stringify(req.body, null, 2));
-    console.log('- User:', req.user ? `${req.user.id} (${req.user.email})` : 'null');
-    console.log('- Auth Header:', req.headers.authorization || 'none');
+    // 🔍 DEBUG: Log essential booking info only
+    console.log('📋 Booking Request:', {
+      tour_id: req.body.tour_id,
+      user_type: req.body.user_type || (req.user ? 'REGISTERED' : 'GUEST'),
+      payment_method: req.body.payment_method,
+      total_price: req.body.total_price
+    });
     
     const {
       // user_id được loại bỏ - sẽ auto-detect từ authentication
@@ -27,9 +29,19 @@ const create = async (req, res) => {
       total_price,
       number_of_adults,
       number_of_children,
-      status,
+      payment_method, // 🆕 BẮT BUỘC: "vnpay" hoặc "momo"
       guests = []
     } = req.body;
+
+    // ✅ KIỂM TRA BẮT BUỘC: Phải có payment_method
+    if (!payment_method || !['vnpay', 'momo'].includes(payment_method.toLowerCase())) {
+      await t.rollback();
+      return res.status(400).json({ 
+        message: "Vui lòng chọn phương thức thanh toán (VNPay hoặc MoMo) để hoàn tất đặt tour.",
+        error: "PAYMENT_METHOD_REQUIRED",
+        available_methods: ["vnpay", "momo"]
+      });
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     // 🔍 AUTO-DETECT: User đăng nhập hay Guest vãng lai
@@ -97,6 +109,19 @@ const create = async (req, res) => {
       await t.rollback();
       return res.status(404).json({ message: "Không tìm thấy tour." });
     }
+
+    // Kiểm tra promotion chỉ áp dụng cho tour thuộc agency
+    if (promotion_id) {
+      const promotion = await Promotion.findByPk(promotion_id);
+      if (!promotion) {
+        await t.rollback();
+        return res.status(400).json({ message: "Mã giảm giá không tồn tại." });
+      }
+      if (promotion.agency_id !== tour.agency_id) {
+        await t.rollback();
+        return res.status(400).json({ message: "Mã giảm giá không áp dụng cho tour này." });
+      }
+    }
     
     const today = new Date();
     const minDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3);
@@ -109,158 +134,336 @@ const create = async (req, res) => {
     // Tính discount amount nếu có promotion
     const original_price = tour.price * (number_of_adults + number_of_children);
     const discount_amount = original_price - total_price;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 TẠO BOOKING "PENDING" TRƯỚC KHI THANH TOÁN
+    // ═══════════════════════════════════════════════════════════════════
     
+    // Tạo booking với status "pending" để track user behavior
     const booking = await Booking.create({
-      user_id: finalUserId, // Sử dụng User ID đã được auto-detect
+      user_id: finalUserId,
       tour_id,
       departure_date_id,
       promotion_id,
-      original_price, // Giá gốc từ tour * số người
-      discount_amount, // Số tiền được giảm giá
-      total_price, // Giá cuối cùng sau discount
+      original_price,
+      discount_amount,
+      total_price,
       number_of_adults,
       number_of_children,
-      status
+      status: 'pending', // 🔄 Pending cho đến khi thanh toán
+      payment_method: payment_method
     }, { transaction: t });
 
-    /* ────────── 3. Tạo guests ────────── */
+    // Tạo guests
     const guestRecords = guests.map(g => ({ ...g, booking_id: booking.id }));
     await InformationBookingTour.bulkCreate(guestRecords, { transaction: t });
 
-    await t.commit();
+    await t.commit(); // ✅ Commit booking "pending"
 
-    /* ────────── 4. Trả booking kèm quan hệ ────────── */
-    const fullBooking = await Booking.findByPk(booking.id, {
+    console.log(`📋 Pending booking created:`, {
+      bookingId: booking.id,
+      type: bookingType,
+      userId: finalUserId,
+      paymentMethod: payment_method,
+      status: 'pending'
+    });
+
+    // 📦 Tạo data package để gửi đến payment gateway
+    const bookingData = {
+      booking_id: booking.id, // 🆕 Thêm booking ID
+      user_id: finalUserId,
+      tour_id,
+      departure_date_id,
+      promotion_id,
+      original_price,
+      discount_amount,
+      total_price,
+      number_of_adults,
+      number_of_children,
+      guests,
+      representative_email: representative.email,
+      representative_name: representative.name || representative.username,
+      tour_name: tour.name,
+      booking_type: bookingType
+    };
+
+    // 🔐 Mã hóa booking data để tránh tampering
+    const encodedBookingData = Buffer.from(JSON.stringify(bookingData)).toString('base64');
+
+    // 💳 Chuyển hướng đến payment gateway tương ứng
+    let paymentResponse;
+    
+    if (payment_method.toLowerCase() === 'vnpay') {
+      // 🏦 VNPay Payment
+      console.log(`💳 Redirecting to VNPay payment for tour: ${tour.name}`);
+      
+      paymentResponse = {
+        message: "Vui lòng hoàn tất thanh toán để xác nhận đặt tour",
+        payment_method: "vnpay",
+        payment_url: `/api/payments/vnpay/create_payment_url`, // ✅ Correct endpoint
+        booking_data: encodedBookingData,
+        tour_info: {
+          name: tour.name,
+          price: total_price,
+          adults: number_of_adults,
+          children: number_of_children
+        },
+        next_step: "Gửi POST request đến payment_url với booking_data trong body"
+      };
+      
+    } else if (payment_method.toLowerCase() === 'momo') {
+      // 🎯 MoMo Payment  
+      console.log(`💰 Redirecting to MoMo payment for tour: ${tour.name}`);
+      
+      paymentResponse = {
+        message: "Vui lòng hoàn tất thanh toán để xác nhận đặt tour",
+        payment_method: "momo",
+        payment_url: `/api/payments/momo/create_payment_url`, // ✅ Correct endpoint  
+        booking_data: encodedBookingData,
+        tour_info: {
+          name: tour.name,
+          price: total_price,
+          adults: number_of_adults,
+          children: number_of_children
+        },
+        next_step: "Gửi POST request đến payment_url với booking_data trong body"
+      };
+    }
+
+    // 🔄 Response cho frontend để redirect đến payment
+    console.log(`🚀 Payment redirection prepared:`, {
+      type: bookingType,
+      userId: finalUserId,
+      representative: representative.email,
+      tourName: tour.name,
+      paymentMethod: payment_method,
+      totalPrice: total_price
+    });
+
+    // Luôn trả về booking_id ở cấp cao nhất để FE dễ lấy
+    return res.status(200).json({
+      booking_id: booking.id,
+      ...paymentResponse
+    });
+
+  } catch (err) {
+    await t.rollback();
+    console.error("❌ BOOKING CREATION ERROR:", err);
+    
+    // 🚨 Thông báo đặt tour thất bại
+    if (err.name === 'SequelizeValidationError') {
+      return res.status(400).json({ 
+        message: "Đặt tour thất bại - Thông tin không hợp lệ",
+        error: "VALIDATION_ERROR",
+        details: err.errors.map(e => e.message)
+      });
+    }
+    
+    return res.status(500).json({ 
+      message: "Đặt tour thất bại - Vui lòng thử lại sau",
+      error: "BOOKING_FAILED"
+    });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// 🎯 CẬP NHẬT BOOKING THÀNH "CONFIRMED" SAU KHI THANH TOÁN THÀNH CÔNG
+// ═══════════════════════════════════════════════════════════════════
+const updateBookingAfterPayment = async (bookingId, paymentInfo) => {
+  try {
+    // Tìm và cập nhật booking từ "pending" thành "confirmed"
+    const booking = await Booking.findByPk(bookingId, {
       include: [
         { 
           model: User, 
           as: "user",
           attributes: ['id', 'name', 'email', 'username']
         },
-        { model: Tour, as: "tour" },
-        { model: DepartureDate, as: "departureDate" },
+        { 
+          model: Tour, 
+          as: "tour",
+          attributes: ['id', 'name', 'destination', 'price']
+        },
+        { 
+          model: DepartureDate, 
+          as: "departureDate",
+          attributes: ['id', 'departure_date', 'number_of_days']
+        },
         { 
           model: Promotion, 
           as: "promotion",
           attributes: ['id', 'code', 'description', 'discount_amount'],
           required: false
         },
-        { model: InformationBookingTour, as: "guests" }
+        { 
+          model: InformationBookingTour, 
+          as: "guests",
+          attributes: ['id', 'name', 'email', 'phone', 'cccd']
+        }
       ]
     });
-
-    // ✅ Success response với thông tin booking type
-    console.log(`✅ Booking created successfully:`, {
-      bookingId: booking.id,
-      type: bookingType,
-      userId: finalUserId,
-      representative: representative.email,
-      tourName: tour.name
-    });
-
-    // 📧 Gửi email thông báo booking đã được tạo (pending payment)
-    try {
-      const departureDate = new Date(departure.departure_date);
-      const formattedDate = departureDate.toLocaleDateString('vi-VN', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-
-      const emailHTML = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-    .booking-card { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
-    .info-label { font-weight: bold; color: #555; }
-    .info-value { color: #333; }
-    .button { background: #e67e22; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 5px; }
-    .warning-box { background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>📋 BOOKING ĐÃ ĐƯỢC TẠO!</h1>
-      <p>Vui lòng hoàn tất thanh toán để xác nhận chỗ</p>
-    </div>
     
-    <div class="content">
-      <div class="booking-card">
-        <h2>🎫 Thông tin booking</h2>
-        <div class="info-row">
-          <span class="info-label">🎫 Mã booking:</span>
-          <span class="info-value"><strong>${booking.id}</strong></span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">🏷️ Tên tour:</span>
-          <span class="info-value"><strong>${tour.name}</strong></span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">📍 Điểm đến:</span>
-          <span class="info-value">${tour.destination}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">📅 Ngày khởi hành:</span>
-          <span class="info-value"><strong>${formattedDate}</strong></span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">💰 Tổng giá:</span>
-          <span class="info-value"><strong>${total_price.toLocaleString('vi-VN')} VNĐ</strong></span>
-        </div>
-      </div>
-
-      <div class="warning-box">
-        <h4>⏰ Quan trọng!</h4>
-        <p><strong>Vui lòng thanh toán trong vòng 15 phút</strong> để giữ chỗ. Booking sẽ tự động hủy nếu không được thanh toán kịp thời.</p>
-      </div>
-
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="http://localhost:3000/booking/${booking.id}/payment" class="button">💳 Thanh toán ngay</a>
-      </div>
-
-      <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 15px 0;">
-        <p><strong>📧 Email này được gửi tự động.</strong> Bạn sẽ nhận được email xác nhận chi tiết sau khi thanh toán thành công.</p>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-      `;
-
-      await sendEmail(
-        representative.email,
-        `📋 Booking đã tạo - Vui lòng thanh toán để xác nhận chỗ`,
-        emailHTML
-      );
-
-      console.log(`📧 Booking created email sent to: ${representative.email}`);
-    } catch (emailError) {
-      console.error('❌ Failed to send booking created email:', emailError);
-      // Không fail booking process nếu email fail
+    if (!booking) {
+      throw new Error(`Booking ${bookingId} not found`);
     }
 
-    return res.status(201).json({
-      success: true,
-      message: bookingType === "AUTHENTICATED_USER" 
-        ? "Đặt tour thành công! Booking đã được tạo cho tài khoản của bạn."
-        : "Đặt tour thành công! Vui lòng kiểm tra email để nhận thông tin chi tiết.",
-      bookingType: bookingType,
-      data: fullBooking
+    if (booking.status !== 'pending') {
+      throw new Error(`Booking ${bookingId} is not in pending status. Current status: ${booking.status}`);
+    }
+
+    // Cập nhật booking thành confirmed với payment info
+    await booking.update({
+      status: 'confirmed',
+      payment_method: paymentInfo.method,
+      payment_id: paymentInfo.transaction_id,
+      confirmed_at: new Date()
+    });
+    
+    console.log(`✅ Booking updated to confirmed:`, {
+      bookingId: booking.id,
+      paymentMethod: paymentInfo.method,
+      transactionId: paymentInfo.transaction_id,
+      previousStatus: 'pending',
+      newStatus: 'confirmed'
     });
 
+    // 📧 GỬI EMAIL XÁC NHẬN BOOKING CHO KHÁCH HÀNG
+    try {
+      const representative = booking.guests && booking.guests[0];
+      if (representative && representative.email) {
+        const emailData = {
+          booking_id: booking.id,
+          tour_name: booking.tour.name,
+          departure_date: new Date(booking.departureDate.departure_date).toLocaleDateString('vi-VN'),
+          total_price: booking.total_price,
+          number_of_adults: booking.number_of_adults,
+          number_of_children: booking.number_of_children,
+          guests: booking.guests,
+          booking_type: booking.user_id === GUEST_USER_ID ? 'GUEST' : 'REGISTERED',
+          user_id: booking.user_id
+        };
+
+        await sendBookingEmail(representative.email, emailData);
+        console.log(`📧 Confirmation email sent to: ${representative.email}`);
+      }
+    } catch (emailError) {
+      console.error(`⚠️ Failed to send confirmation email for booking ${bookingId}:`, emailError);
+      // Không throw error để không ảnh hưởng đến luồng chính
+    }
+
+    await tourController.updateBookingSummary();
+    return booking;
   } catch (err) {
-    await t.rollback();
-    console.error("❌ Lỗi khi tạo booking:", err);
-    res.status(500).json({ message: "Tạo booking thất bại", error: err.message });
+    console.error(`❌ Failed to update booking ${bookingId}:`, err);
+    throw err;
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// 🚫 CẬP NHẬT BOOKING THÀNH "FAILED" KHI THANH TOÁN THẤT BẠI
+// ═══════════════════════════════════════════════════════════════════
+const updateBookingToFailed = async (bookingId, reason = 'payment_failed') => {
+  try {
+    const booking = await Booking.findByPk(bookingId);
+    
+    if (!booking) {
+      console.warn(`⚠️ Booking ${bookingId} not found for failure update`);
+      return null;
+    }
+
+    if (booking.status === 'confirmed') {
+      console.warn(`⚠️ Cannot mark confirmed booking ${bookingId} as failed`);
+      return booking;
+    }
+
+    // Cập nhật booking thành failed
+    await booking.update({
+      status: 'failed',
+      failure_reason: reason,
+      failed_at: new Date()
+    });
+    
+    console.log(`❌ Booking marked as failed:`, {
+      bookingId: booking.id,
+      reason,
+      previousStatus: booking.status,
+      newStatus: 'failed'
+    });
+
+    return booking;
+  } catch (err) {
+    console.error(`❌ Failed to mark booking ${bookingId} as failed:`, err);
+    throw err;
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// 🔍 LẤY BOOKING DATA VỚI PAYMENT INFO CHO FRONTEND
+// ═══════════════════════════════════════════════════════════════════
+const getBookingWithPayment = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    
+    // Tìm booking với đầy đủ thông tin
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        { 
+          model: User, 
+          as: "user",
+          attributes: ['id', 'name', 'email', 'username']
+        },
+        { 
+          model: Tour, 
+          as: "tour",
+          attributes: ['id', 'name', 'destination', 'price']
+        },
+        { 
+          model: DepartureDate, 
+          as: "departureDate",
+          attributes: ['id', 'departure_date', 'number_of_days']
+        },
+        { 
+          model: Promotion, 
+          as: "promotion",
+          attributes: ['id', 'code', 'description', 'discount_amount'],
+          required: false
+        },
+        { 
+          model: InformationBookingTour, 
+          as: "guests",
+          attributes: ['id', 'name', 'email', 'phone', 'cccd']
+        }
+      ]
+    });
+    
+    if (!booking) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Không tìm thấy booking' 
+      });
+    }
+    
+    // Tìm payment record cho booking này
+    const payment = await Payment.findOne({
+      where: { booking_id: bookingId },
+      order: [['created_at', 'DESC']] // Lấy payment mới nhất
+    });
+    
+    return res.json({
+      success: true,
+      data: {
+        ...payment?.dataValues || {},
+        booking: booking
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error getting booking with payment:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi hệ thống',
+      error: error.message
+    });
   }
 };
 
@@ -284,5 +487,8 @@ module.exports = {
     },
     { model: InformationBookingTour, as: "guests" }
   ]),
-  create
+  create,
+  updateBookingAfterPayment,
+  updateBookingToFailed,
+  getBookingWithPayment
 };

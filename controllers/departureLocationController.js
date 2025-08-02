@@ -53,15 +53,39 @@ exports.getDepartureLocationsWithCount = async (req, res) => {
         },
         status: 'Đang hoạt động'
       },
-      group: ['departure_location'],
-      order: [['departure_location', 'ASC']],
+      group: ['departure_location'], // Thêm dòng này!
       raw: true
     });
 
+    // Chỉ gộp các biến thể của Hồ Chí Minh, các địa điểm khác giữ nguyên
+    function normalizeName(name) {
+      const raw = name.replace(/\s+/g, '').toLowerCase();
+      if (raw === 'tp.hồchíminh' || raw === 'tp.hochiminh' || raw === 'tphochiminh' || raw === 'tphồchíminh') {
+        return 'TP. Hồ Chí Minh';
+      }
+      return name.trim();
+    }
+
+    // Gộp các tên Hồ Chí Minh, các địa điểm khác giữ nguyên
+    const grouped = {};
+    departureLocations.forEach(item => {
+      const key = normalizeName(item.departure_location);
+      if (!grouped[key]) {
+        grouped[key] = {
+          departure_location: key,
+          tour_count: 0
+        };
+      }
+      grouped[key].tour_count += parseInt(item.tour_count);
+    });
+
+    // Đảm bảo trả về đúng từng địa điểm như trong db
+    const result = Object.values(grouped);
+
     res.json({
       success: true,
-      data: departureLocations,
-      count: departureLocations.length
+      data: result,
+      count: result.length
     });
 
   } catch (error) {

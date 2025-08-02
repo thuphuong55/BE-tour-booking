@@ -5,7 +5,7 @@ const app = express();
 const db = require("./models");
 
 // Import optimization middleware
-const optimizationMiddleware = require("./middleware/optimizationMiddleware");
+const optimizationMiddleware = require("./middlewares/optimizationMiddleware");
 
 // Apply database sync
 db.sequelize.sync();
@@ -15,7 +15,14 @@ app.use(optimizationMiddleware);
 
 // CORS và JSON parsing (sau optimization middleware)
 app.use(cors());
-app.use(express.json());
+// Chỉ parse JSON cho các method có body
+app.use((req, res, next) => {
+  if (["POST", "PUT", "PATCH"].includes(req.method)) {
+    express.json()(req, res, next);
+  } else {
+    next();
+  }
+});
 
 // Import tất cả routes
 // Agency Management Routes (phải đặt trước /api/agency)  
@@ -45,6 +52,21 @@ app.use("/api/faqs", require("./routes/faqRoutes"));
 app.use("/api/tour-categories", require("./routes/tourCategoryRoutes"));
 app.use("/api/tour-tour-categories", require("./routes/tourTourCategoryRoutes"));
 app.use("/api/itinerary-locations", require("./routes/itineraryLocationRoutes"));
+
+// Debug middleware for departure-dates routes
+app.use("/api/departure-dates", (req, res, next) => {
+  console.log(`🔍 Departure-dates request: ${req.method} ${req.originalUrl}`);
+  console.log(`🔍 Headers:`, req.headers);
+  console.log(`🔍 Body:`, req.body);
+  console.log(`🔍 Calling next() to proceed to route handler...`);
+  try {
+    next();
+    console.log(`🔍 next() called successfully`);
+  } catch (error) {
+    console.error(`🔍 Error in next():`, error);
+  }
+});
+
 app.use("/api/departure-dates", require("./routes/departureDateRoutes"));
 app.use("/api/hotels", require("./routes/hotelRoutes"));
 app.use("/api/hotel-locations", require("./routes/hotelLocationRoutes"));
@@ -62,6 +84,16 @@ app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use('/api/search', require('./routes/searchRoutes'));
 app.use('/api/data', require('./routes/dataRoutes'));
 
+// Debug middleware for cancel-booking routes
+app.use("/api/cancel-booking", (req, res, next) => {
+  console.log(`🔍 Cancel-booking request: ${req.method} ${req.originalUrl}`);
+  console.log(`🔍 Headers:`, req.headers);
+  next();
+});
+
+app.use("/api/cancel-booking", require("./routes/cancelBookingRoutes"));
+app.use("/api/refunds", require("./routes/refundRoutes"));
+
 // Admin Management Routes
 app.use("/api/admin/bookings", require("./routes/adminBookingRoutes"));
 app.use("/api/admin/payments", require("./routes/adminPaymentRoutes"));
@@ -71,20 +103,23 @@ app.use('/api/commissions', require('./routes/commissionRoutes'));
 
 // Global error handling middleware for JSON parsing errors
 app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+  if (
+    err instanceof SyntaxError &&
+    err.status === 400 &&
+    'body' in err &&
+    ['POST', 'PUT', 'PATCH'].includes(req.method)
+  ) {
     console.error('📝 JSON Parsing Error:');
     console.error('URL:', req.method, req.url);
     console.error('Content-Type:', req.headers['content-type']);
     console.error('Error:', err.message);
     console.error('Raw body preview:', err.body?.substring(0, 200) || 'No body');
-    
-    return res.status(400).json({ 
+    return res.status(400).json({
       message: 'Invalid JSON format',
       error: 'Request body contains invalid JSON',
       details: err.message
     });
   }
-  
   // Pass to next error handler
   next(err);
 });

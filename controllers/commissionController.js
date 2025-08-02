@@ -294,10 +294,15 @@ const commissionController = {
   async create(req, res) {
     try {
       const { booking_id, agency_id, amount, rate, status = 'pending' } = req.body;
+      // Chỉ kiểm tra tồn tại agency khi tạo mới commission
       const booking = await Booking.findByPk(booking_id);
-      const agency = await User.findByPk(agency_id);
-      if (!booking || !agency) {
-        return res.status(404).json({ error: 'Booking hoặc agency không tồn tại' });
+      if (!booking) {
+        return res.status(404).json({ error: 'Booking không tồn tại' });
+      }
+      // agency_id là agency.id, kiểm tra bảng agency
+      const agency = await require('../models').Agency.findByPk(agency_id);
+      if (!agency) {
+        return res.status(404).json({ error: 'Agency không tồn tại' });
       }
       const commission = await Commission.create({
         booking_id,
@@ -319,11 +324,12 @@ const commissionController = {
       const where = {};
       if (agency_id) where.agency_id = agency_id;
       if (status) where.status = status;
+      const { Agency } = require('../models');
       const commissions = await Commission.findAll({ 
         where, 
         include: [
           { model: Booking, as: 'booking' },
-          { model: User, as: 'agency' }
+          { model: Agency, as: 'agency' }
         ]
       });
       res.json(commissions);
@@ -335,10 +341,11 @@ const commissionController = {
   // Lấy chi tiết hoa hồng
   async getById(req, res) {
     try {
+      const { Agency } = require('../models');
       const commission = await Commission.findByPk(req.params.id, { 
         include: [
           { model: Booking, as: 'booking' },
-          { model: User, as: 'agency' }
+          { model: Agency, as: 'agency' }
         ]
       });
       if (!commission) return res.status(404).json({ error: 'Không tìm thấy commission' });
@@ -364,6 +371,10 @@ const commissionController = {
   async reversal(req, res) {
     try {
       const { booking_id, agency_id, amount } = req.body;
+      const agency = await require('../models').Agency.findByPk(agency_id);
+      if (!agency) {
+        return res.status(404).json({ error: 'Agency không tồn tại' });
+      }
       const reversal = await Commission.create({
         booking_id,
         agency_id,

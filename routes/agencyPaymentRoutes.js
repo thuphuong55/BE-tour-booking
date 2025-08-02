@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const agencyPaymentController = require("../controllers/agencyPaymentController");
-const { protect } = require("../middlewares/authMiddleware");
+const { protect } = require("../middlewares/auth");
 const ensureAgencyApproved = require("../middlewares/ensureAgencyApproved");
 
 // Tất cả routes yêu cầu agency role và agency đã được approved

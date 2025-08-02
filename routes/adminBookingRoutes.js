@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const adminBookingController = require("../controllers/adminBookingController");
-const { protect } = require("../middlewares/authMiddleware");
+const { protect } = require("../middlewares/auth");
 
 // Tất cả routes yêu cầu admin role
 router.use(protect(['admin']));
