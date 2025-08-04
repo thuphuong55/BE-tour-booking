@@ -2,6 +2,13 @@ const { Promotion, Tour, User } = require("../models");
 const { Op } = require("sequelize");
 
 const promotionController = {
+  // Middleware kiểm tra user đăng nhập khi sử dụng mã giảm giá
+  async validateUserForPromotion(req, res, next) {
+    if (!req.user || !req.user.id) {
+      return res.status(403).json({ error: "Bạn cần đăng nhập để sử dụng mã giảm giá" });
+    }
+    next();
+  },
   // GET /promotions - Lấy tất cả promotions
   async getAll(req, res) {
     try {

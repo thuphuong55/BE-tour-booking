@@ -11,6 +11,7 @@ router.get('/top', searchController.getTopSearchLocations);
 // Lấy top 5 điểm đến nổi bật (destinations)
 router.get('/top-destinations', searchController.getTopSearchDestinations);
 
-
+// API gợi ý tìm kiếm (autocomplete/suggestions)
+router.get('/suggestions', searchController.getSearchSuggestions);
 
 module.exports = router;

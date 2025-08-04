@@ -3,7 +3,15 @@ const generateCrudController = require("./generateCrudController");
 
 // GET /api/departure-dates (phân quyền, phân trang, lọc theo agency)
 const getAllDepartureDates = async (req, res) => {
+  console.log("🎯 [CONTROLLER] getAllDepartureDates CONTROLLER CALLED!");
   try {
+    console.log('[DEBUG-DEPARTURE] User from req.user:', {
+      id: req.user?.id,
+      email: req.user?.email,
+      role: req.user?.role,
+      fullUser: req.user
+    });
+    
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
     const whereClause = {};
@@ -12,9 +20,16 @@ const getAllDepartureDates = async (req, res) => {
     if (req.user && req.user.role === 'agency') {
       const { Agency } = require("../models");
       const agency = await Agency.findOne({ where: { user_id: req.user.id } });
+      console.log('[DEBUG-DEPARTURE] Agency found for user_id', req.user.id, ':', agency?.id);
+      
       if (agency) {
         const tours = await Tour.findAll({ where: { agency_id: agency.id }, attributes: ['id'] });
         whereClause.tour_id = tours.map(t => t.id);
+        console.log('[DEBUG-DEPARTURE] Tours for agency:', whereClause.tour_id);
+      } else {
+        // Nếu không tìm thấy agency, trả về rỗng
+        console.log('[DEBUG-DEPARTURE] No agency found for user_id:', req.user.id);
+        return res.json({ data: [], pagination: { total: 0, page: Number(page), limit: Number(limit) } });
       }
     } else if (req.query.tour_id) {
       whereClause.tour_id = req.query.tour_id;
@@ -173,26 +188,58 @@ const deleteDepartureDate = async (req, res) => {
 // Định nghĩa lại hàm getBookingsByDepartureDate cho export
 const getBookingsByDepartureDate = async (req, res) => {
   try {
+    console.log('[DEBUG-BOOKINGS] getBookingsByDepartureDate called with:', {
+      id: req.params.id,
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      userEmail: req.user?.email
+    });
+    
     const { id } = req.params;
     // Kiểm tra quyền: agency chỉ có thể xem booking của departure date thuộc tour mình sở hữu
     if (req.user && req.user.role === 'agency') {
+      console.log('[DEBUG-BOOKINGS] Agency user detected, checking permissions...');
+      
       const departureDate = await DepartureDate.findByPk(id, {
         include: [{ model: Tour, as: 'tour', attributes: ['agency_id'] }]
       });
       if (!departureDate) {
+        console.log('[DEBUG-BOOKINGS] Departure date not found:', id);
         return res.status(404).json({ error: 'Ngày khởi hành không tồn tại' });
       }
+      
+      console.log('[DEBUG-BOOKINGS] Found departure date:', {
+        id: departureDate.id,
+        tourId: departureDate.tour_id,
+        tourAgencyId: departureDate.tour?.agency_id
+      });
       
       const { Agency } = require("../models");
       const agency = await Agency.findOne({ where: { user_id: req.user.id } });
       
+      console.log('[DEBUG-BOOKINGS] Found agency for user:', {
+        userId: req.user.id,
+        agencyId: agency?.id,
+        agencyName: agency?.name
+      });
+      
       if (!agency) {
+        console.log('[DEBUG-BOOKINGS] No agency found for user');
         return res.status(403).json({ error: 'Không tìm thấy agency cho user này' });
       }
 
+      console.log('[DEBUG-BOOKINGS] Permission check:', {
+        tourAgencyId: departureDate.tour.agency_id,
+        userAgencyId: agency.id,
+        match: departureDate.tour.agency_id === agency.id
+      });
+
       if (departureDate.tour.agency_id !== agency.id) {
+        console.log('[DEBUG-BOOKINGS] Permission denied - agency mismatch');
         return res.status(403).json({ error: 'Bạn không có quyền xem booking này' });
       }
+      
+      console.log('[DEBUG-BOOKINGS] Permission granted, fetching bookings...');
     }
     const bookings = await Booking.findAll({
       where: { departure_date_id: id },
@@ -215,6 +262,14 @@ const getById = async (req, res) => {
     });
     if (!departureDate) {
       return res.status(404).json({ error: 'Ngày khởi hành không tồn tại' });
+    }
+    // Nếu là agency, chỉ trả về nếu tour thuộc agency đó
+    if (req.user && req.user.role === 'agency') {
+      const { Agency } = require("../models");
+      const agency = await Agency.findOne({ where: { user_id: req.user.id } });
+      if (!agency || departureDate.tour.agency_id !== agency.id) {
+        return res.status(403).json({ error: 'Bạn không có quyền xem ngày khởi hành này' });
+      }
     }
     res.json(departureDate);
   } catch (err) {

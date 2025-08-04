@@ -1,9 +1,13 @@
+
 const express = require("express");
 const router = express.Router();
 const agencyBookingController = require("../controllers/agencyBookingController");
 const { protect } = require("../middlewares/auth");
 const ensureAgencyApproved = require("../middlewares/ensureAgencyApproved");
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+// Top tours theo số lượng booking confirmed
+router.get("/top-tours", protect(['agency']), asyncHandler(ensureAgencyApproved), agencyBookingController.getTopToursByBooking);
 
 // Tất cả routes yêu cầu agency role và agency đã được approved
 // Middleware cho từng route

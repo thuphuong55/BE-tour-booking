@@ -1,3 +1,44 @@
+// Agency submits a draft tour for approval
+const submitForApproval = async (req, res) => {
+  try {
+    const tourId = req.params.id;
+    const userId = req.user.id;
+    // Find agency for user
+    const agency = await Agency.findOne({ where: { user_id: userId } });
+    if (!agency) {
+      return res.status(403).json({ message: "Không tìm thấy thông tin agency cho user này" });
+    }
+    // Find tour, must belong to agency and be draft
+    const tour = await Tour.findOne({ where: { id: tourId, agency_id: agency.id, status: 'draft' } });
+    if (!tour) {
+      return res.status(404).json({ message: "Tour không tồn tại, không thuộc agency, hoặc không ở trạng thái draft" });
+    }
+    // Validate required info
+    const itineraries = await tour.getItineraries();
+    const departureDates = await tour.getDepartureDates();
+    const locations = await tour.getLocations();
+    if (!tour.name || !tour.destination || !tour.price || !itineraries.length || !departureDates.length || !locations.length) {
+      return res.status(400).json({
+        message: "Tour chưa đủ thông tin để gửi duyệt. Yêu cầu: tên, điểm đến, giá, hành trình, ngày khởi hành, địa điểm.",
+        missing: {
+          name: !tour.name,
+          destination: !tour.destination,
+          price: !tour.price,
+          itineraries: !itineraries.length,
+          departureDates: !departureDates.length,
+          locations: !locations.length
+        }
+      });
+    }
+    // Update status to 'Chờ duyệt'
+    tour.status = 'Chờ duyệt';
+    await tour.save();
+    res.json({ message: "Tour đã gửi duyệt thành công", tour });
+  } catch (err) {
+    console.error("Lỗi khi gửi duyệt tour:", err);
+    res.status(500).json({ message: "Lỗi server khi gửi duyệt tour", error: err.message });
+  }
+};
 // Endpoint cập nhật lại bảng booking_summary từ bảng booking (status=confirmed)
 const updateBookingSummary = async (req, res) => {
   try {
@@ -28,7 +69,7 @@ const { paginatedResponse, errorResponse } = require("../utils/responseOptimizer
 const { smartTransformForUpdate } = require("../utils/tourDataTransformer");
 
 const TOUR_LIST_FIELDS = [
-  'id', 'name', 'location', 'destination', 'price', 
+  'id', 'name', 'location', 'destination', 'price',
   'tour_type', 'status', 'created_at'
 ];
 
@@ -71,23 +112,23 @@ const getAll = async (req, res) => {
   try {
     // Extract pagination parameters với limits hợp lý
     const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 10, 50); // Max 50 items
+    const limit = parseInt(req.query.limit) || 10; // Không giới hạn cứng 50
     const offset = (page - 1) * limit;
-    
+
     // Extract filter parameters
     const status = req.query.status;
     const search = req.query.search;
-    
+
     // 🚀 OPTIMIZATION: Build optimized where clause
     let where = {};
-    
+
     // Phân quyền: admin xem tất cả, agency chỉ xem tour của mình
     if (req.user && req.user.role === 'agency') {
       const agency = await Agency.findOne({
         where: { user_id: req.user.id },
         attributes: ['id'] // Chỉ lấy id
       });
-      
+
       if (agency) {
         where.agency_id = agency.id;
       } else {
@@ -96,17 +137,17 @@ const getAll = async (req, res) => {
         }));
       }
     }
-    
+
     // Nếu có query agency_id thì filter đúng agency_id
     if (req.query.agency_id) {
       where.agency_id = req.query.agency_id;
     }
-    
+
     // Filter by status if provided
     if (status) {
       where.status = status;
     }
-    
+
     // 🚀 OPTIMIZATION: Optimized search query
     if (search) {
       const { Op } = require("sequelize");
@@ -124,7 +165,7 @@ const getAll = async (req, res) => {
       limit,
       offset,
       order: [['created_at', 'DESC']],
-      
+
       // 🚀 OPTIMIZATION: Sequelize performance options
       subQuery: false, // Faster joins
       distinct: true   // Avoid duplicates
@@ -143,7 +184,7 @@ const getAll = async (req, res) => {
     }, 'tour_list');
 
     res.json(response);
-    
+
   } catch (err) {
     console.error("❌ Error getting tours:", err);
     res.status(500).json(errorResponse('Lỗi server khi lấy danh sách tour', 500, err.message));
@@ -208,7 +249,7 @@ const getById = async (req, res) => {
           departureDates_id: date.departureDates_id,
           departure_date: date.departure_date
         });
-        
+
         const departureId = date.id || date.departureDates_id;
         if (!departureId) {
           console.log("⚠️ No valid departure ID found, skipping booking calculation");
@@ -218,7 +259,7 @@ const getById = async (req, res) => {
             booked: 0
           };
         }
-        
+
         // Đếm tổng số người đã đặt cho ngày này (chỉ booking đã xác nhận)
         const bookings = await Booking.findAll({
           where: {
@@ -254,7 +295,7 @@ const create = async (req, res) => {
     console.log("📝 Raw request body:", JSON.stringify(req.body, null, 2));
 
     // Destructure để tách core tour data vs relations
-    const {
+    let {
       hotel_ids = [],
       category_ids = [],
       included_service_ids = [],
@@ -262,14 +303,46 @@ const create = async (req, res) => {
       selectedIncludedServices = [],
       selectedCategories = [],
       excludedServices = [],            // Alternative field name
+      selectedExcludedServices = [],    // Thêm dòng này để destructure đúng
       images = [],
       departureDates = [],
       service = [], // Thêm service từ request
       destination_id, // ID của destination để auto-populate name
       location_id,    // ID của location để auto-populate name (legacy single location)
       location_ids = [], // Multiple location IDs (new feature)
+      locations = [], // Nhận từ FE nếu gửi locations là mảng id
+      departure_date,
+      number_of_days,
       ...tourData
     } = req.body;
+
+    // Nếu FE gửi locations là mảng id, tự động merge vào location_ids
+    if (Array.isArray(locations) && locations.length > 0) {
+      location_ids = [...location_ids, ...locations];
+      // Loại bỏ trùng lặp
+      location_ids = [...new Set(location_ids)];
+      console.log('[AUTO] Merged locations array from FE vào location_ids:', location_ids);
+    }
+
+    // Nếu FE gửi location là string (tên), tự động tìm Location theo tên và gán vào location_ids
+    if (typeof tourData.location === 'string' && tourData.location.trim()) {
+      const foundLocations = await Location.findAll({ where: { name: tourData.location.trim() } });
+      if (foundLocations && foundLocations.length > 0) {
+        location_ids = [...location_ids, ...foundLocations.map(l => l.id)];
+        location_ids = [...new Set(location_ids)];
+        console.log('[AUTO] Found location by name and merged to location_ids:', location_ids);
+      } else {
+        console.log('[WARN] Không tìm thấy Location với tên:', tourData.location);
+      }
+    }
+
+    // Nếu FE gửi departure_date là mảng ngày, tự động chuyển thành departureDates mảng object
+    if (Array.isArray(departure_date) && departure_date.length > 0 && (!departureDates || departureDates.length === 0)) {
+      // Nếu có number_of_days thì dùng, không thì default 1
+      const days = typeof number_of_days === 'number' ? number_of_days : 1;
+      departureDates = departure_date.map(date => ({ departure_date: date, number_of_days: days }));
+      console.log('[AUTO] Converted departure_date array to departureDates:', departureDates);
+    }
 
     console.log("🔍 Destructured relations:");
     console.log("- hotel_ids:", hotel_ids, "Type:", typeof hotel_ids, "IsArray:", Array.isArray(hotel_ids));
@@ -326,7 +399,7 @@ const create = async (req, res) => {
         });
       }
       console.log("✅ Admin tạo tour cho agency:", tourData.agency_id);
-      
+
     } else if (req.user?.role === 'agency') {
       // Agency: Tự động gán agency_id từ user đăng nhập, IGNORE agency_id từ request
       const userAgency = await Agency.findOne({ where: { user_id: req.user.id } });
@@ -346,11 +419,11 @@ const create = async (req, res) => {
         tourData.status = 'Đang hoạt động'; // Auto-approved and active
       }
       console.log("🔰 Admin tạo tour - AUTO APPROVED & ACTIVE");
-      
+
     } else if (req.user?.role === 'agency') {
-      // Agency: Tour cần duyệt, chưa hoạt động
-      tourData.status = 'Chờ duyệt'; // Pending approval
-      console.log("⏳ Agency tạo tour - PENDING APPROVAL");
+      // Agency: Tour bắt đầu ở trạng thái draft
+      tourData.status = 'draft'; // Initial draft status
+      console.log("⏳ Agency tạo tour - DRAFT");
     }
 
     console.log("🎯 Core tour data sẽ lưu:", tourData);
@@ -383,30 +456,34 @@ const create = async (req, res) => {
       const existingServices = await IncludedService.findAll({
         where: { id: servicesToAdd }
       });
-      
+
       if (existingServices.length !== servicesToAdd.length) {
         console.log('⚠️ Some included services not found:', servicesToAdd);
         console.log('✅ Existing services:', existingServices.map(s => s.id));
       }
-      
+
       if (existingServices.length > 0) {
         await tour.setIncludedServices(existingServices.map(s => s.id));
       }
     }
 
     // 🚫 Xử lý excluded services (cả excludedServices và excluded_service_ids)
-    const excludedServicesToAdd = [...excludedServices, ...excluded_service_ids].filter(Boolean);
+    const excludedServicesToAdd = [
+      ...excludedServices,
+      ...excluded_service_ids,
+      ...selectedExcludedServices // Thêm dòng này
+    ].filter(Boolean);
     if (excludedServicesToAdd.length > 0) {
       console.log("🚫 Thêm excluded services:", excludedServicesToAdd);
       const existingExcludedServices = await ExcludedService.findAll({
         where: { id: excludedServicesToAdd }
       });
-      
+
       if (existingExcludedServices.length !== excludedServicesToAdd.length) {
         console.log('⚠️ Some excluded services not found:', excludedServicesToAdd);
         console.log('✅ Existing excluded services:', existingExcludedServices.map(s => s.id));
       }
-      
+
       if (existingExcludedServices.length > 0) {
         await tour.setExcludedServices(existingExcludedServices.map(s => s.id));
       }
@@ -419,12 +496,12 @@ const create = async (req, res) => {
       const existingCategories = await TourCategory.findAll({
         where: { id: categoriesToAdd }
       });
-      
+
       if (existingCategories.length !== categoriesToAdd.length) {
         console.log('⚠️ Some categories not found:', categoriesToAdd);
         console.log('✅ Existing categories:', existingCategories.map(c => c.id));
       }
-      
+
       if (existingCategories.length > 0) {
         await tour.setCategories(existingCategories.map(c => c.id));
       }
@@ -434,17 +511,17 @@ const create = async (req, res) => {
     if (hotel_ids.length > 0) {
       console.log("🏨 Processing hotels:", hotel_ids);
       console.log("🏨 Hotel IDs type:", typeof hotel_ids[0]);
-      
+
       // Kiểm tra hotels có tồn tại không
       const existingHotels = await Hotel.findAll({
         where: { id: hotel_ids }
       });
-      console.log("🏨 Found existing hotels:", existingHotels.map(h => ({ 
-        id: h.id, 
+      console.log("🏨 Found existing hotels:", existingHotels.map(h => ({
+        id: h.id,
         id_hotel_field: h.getDataValue('id_hotel'),
-        name: h.ten_khach_san 
+        name: h.ten_khach_san
       })));
-      
+
       if (existingHotels.length > 0) {
         // Sử dụng primary key (id) thay vì field mapped
         const hotelIds = existingHotels.map(h => h.id);
@@ -460,7 +537,7 @@ const create = async (req, res) => {
 
     // Xử lý multiple locations (new feature)
     const locationsToProcess = [];
-    
+
     // Support cả single location (legacy) và multiple locations (new)
     if (location_id) {
       locationsToProcess.push(location_id);
@@ -468,29 +545,29 @@ const create = async (req, res) => {
     if (location_ids && location_ids.length > 0) {
       locationsToProcess.push(...location_ids);
     }
-    
+
     // Remove duplicates
     const uniqueLocationIds = [...new Set(locationsToProcess)];
-    
+
     if (uniqueLocationIds.length > 0) {
       console.log("📍 Processing locations:", uniqueLocationIds);
       console.log("📍 Location IDs type:", typeof uniqueLocationIds[0]);
-      
+
       // Kiểm tra locations có tồn tại không
       const existingLocations = await Location.findAll({
         where: { id: uniqueLocationIds }
       });
-      console.log("📍 Found existing locations:", existingLocations.map(l => ({ 
-        id: l.id, 
-        name: l.name 
+      console.log("📍 Found existing locations:", existingLocations.map(l => ({
+        id: l.id,
+        name: l.name
       })));
-      
+
       if (existingLocations.length > 0) {
         const locationIds = existingLocations.map(l => l.id);
         console.log("📍 Setting locations with IDs:", locationIds);
         await tour.setLocations(locationIds);
         console.log("📍 Locations set successfully");
-        
+
         // Auto-populate location field với tên của location đầu tiên (backward compatibility)
         if (!tourData.location && existingLocations[0]) {
           await tour.update({ location: existingLocations[0].name });
@@ -543,12 +620,12 @@ const update = async (req, res) => {
     // 🎯 LOGIC PHÂN QUYỀN: Admin vs Agency
     console.log("👤 User role:", req.user?.role);
     console.log("🏢 Tour agency_id:", req.body.agency_id);
-    
+
     if (req.user?.role === 'admin') {
       console.log("✏️ Admin updating tour", req.params.id, "with data:", {
         id: req.body.id,
         name: req.body.name,
-        updatedBy: req.user.email
+        updatedBy: req.user?.email || req.user?.id || 'unknown'
       });
     } else if (req.user?.role === 'agency') {
       console.log("🏢 Agency updating their own tour", req.params.id);
@@ -564,7 +641,7 @@ const update = async (req, res) => {
       console.error("❌ smartTransformForUpdate failed:", transformError);
       return res.status(500).json({ message: "Transform error", error: transformError.message });
     }
-    
+
     console.log("🔄 Transformed data for processing:", Object.keys(transformedData));
     console.log("🔄 Raw excluded_service_ids from req.body:", req.body.excluded_service_ids);
     console.log("🔄 Transformed excluded_service_ids:", transformedData.excluded_service_ids);
@@ -578,6 +655,7 @@ const update = async (req, res) => {
       selectedIncludedServices = [],
       selectedCategories = [],
       excludedServices = [],            // Alternative field name
+      selectedExcludedServices = [],    // Thêm dòng này để destructure đúng
       images,
       departureDates,
       destination_id, // ID của destination để auto-populate name
@@ -637,6 +715,39 @@ const update = async (req, res) => {
       destination: tourData.destination
     });
 
+    // Kiểm tra nếu agency cập nhật tour đã có booking xác nhận ở bất kỳ ngày khởi hành nào
+    let hasConfirmedBooking = false;
+    if (req.user?.role === 'agency') {
+      // Lấy tất cả ngày khởi hành của tour
+      const departureDates = await DepartureDate.findAll({ where: { tour_id: tour.id } });
+      if (departureDates && departureDates.length > 0) {
+        // Kiểm tra từng ngày khởi hành có booking xác nhận không
+        for (const date of departureDates) {
+          const bookingCount = await Booking.count({
+            where: {
+              tour_id: tour.id,
+              departure_date_id: date.id,
+              status: 'confirmed'
+            }
+          });
+          if (bookingCount > 0) {
+            hasConfirmedBooking = true;
+            break;
+          }
+        }
+      }
+      if (hasConfirmedBooking) {
+        // Chỉ cho phép cập nhật khách sạn
+        if (
+          (Object.keys(tourData).length > 0 && Object.keys(tourData).some(key => key !== 'hotel_ids')) ||
+          images || departureDates || category_ids.length > 0 || included_service_ids.length > 0 || excluded_service_ids.length > 0 || selectedIncludedServices.length > 0 || selectedCategories.length > 0 || excludedServices.length > 0 || selectedExcludedServices.length > 0 || location_id || location_ids.length > 0 || destination_id
+        ) {
+          return res.status(403).json({
+            message: "Tour đã có booking xác nhận ở ngày khởi hành, agency chỉ được phép thay đổi khách sạn (hotel)."
+          });
+        }
+      }
+    }
     // Update core tour data (bao gồm location, destination)
     if (req.user?.role === 'admin') {
       console.log("🎯 Admin updating core tour data:", tourData);
@@ -674,10 +785,10 @@ const update = async (req, res) => {
     console.log("🔧 About to process included services:");
     console.log("- selectedIncludedServices:", selectedIncludedServices, "length:", selectedIncludedServices.length);
     console.log("- included_service_ids:", included_service_ids, "length:", included_service_ids.length);
-    
+
     const servicesToUpdate = [...selectedIncludedServices, ...included_service_ids].filter(Boolean);
     console.log("🔧 Combined servicesToUpdate:", servicesToUpdate, "length:", servicesToUpdate.length);
-    
+
     if (servicesToUpdate.length > 0) {
       if (req.user?.role === 'admin') {
         console.log("🔧 Admin updating included services:", servicesToUpdate);
@@ -687,12 +798,12 @@ const update = async (req, res) => {
       const existingServices = await IncludedService.findAll({
         where: { id: servicesToUpdate }
       });
-      
+
       if (existingServices.length !== servicesToUpdate.length) {
         console.log('⚠️ Some included services not found:', servicesToUpdate);
         console.log('✅ Existing services:', existingServices.map(s => s.id));
       }
-      
+
       await tour.setIncludedServices(existingServices.map(s => s.id));
       if (req.user?.role === 'admin') {
         console.log("✅ Included services updated by admin");
@@ -709,11 +820,15 @@ const update = async (req, res) => {
     console.log("🚫 About to process excluded services:");
     console.log("- excludedServices array:", excludedServices, "length:", excludedServices.length);
     console.log("- excluded_service_ids array:", excluded_service_ids, "length:", excluded_service_ids.length);
-    
-    const excludedServicesToUpdate = [...excludedServices, ...excluded_service_ids].filter(Boolean);
+
+    const excludedServicesToUpdate = [
+      ...excludedServices,
+      ...excluded_service_ids,
+      ...selectedExcludedServices
+    ].filter(Boolean);
     console.log("🚫 Combined excludedServicesToUpdate:", excludedServicesToUpdate, "length:", excludedServicesToUpdate.length);
     console.log("🚫 ================================================================");
-    
+
     if (excludedServicesToUpdate.length > 0) {
       if (req.user?.role === 'admin') {
         console.log("🚫 Admin updating excluded services:", excludedServicesToUpdate);
@@ -729,11 +844,11 @@ const update = async (req, res) => {
         console.log('⚠️ Some excluded services not found:', excludedServicesToUpdate);
         console.log('✅ Existing excluded services:', existingExcludedServices.map(s => s.id));
       }
-      
+
       console.log("🔄 About to call tour.setExcludedServices with IDs:", existingExcludedServices.map(s => s.id));
       await tour.setExcludedServices(existingExcludedServices.map(s => s.id));
       console.log("🔄 setExcludedServices completed successfully");
-      
+
       // Kiểm tra lại database ngay sau khi set
       const { sequelize } = require('../models');
       const [checkResult] = await sequelize.query(
@@ -741,7 +856,7 @@ const update = async (req, res) => {
         { replacements: [tour.id], type: sequelize.QueryTypes.SELECT }
       );
       console.log("🔍 Database check after setExcludedServices:", checkResult.length, "records found");
-      
+
       if (req.user?.role === 'admin') {
         console.log("✅ Excluded services updated by admin");
       } else {
@@ -761,10 +876,10 @@ const update = async (req, res) => {
     console.log("📂 About to process categories:");
     console.log("- selectedCategories:", selectedCategories, "length:", selectedCategories.length);
     console.log("- category_ids:", category_ids, "length:", category_ids.length);
-    
+
     const categoriesToUpdate = [...selectedCategories, ...category_ids].filter(Boolean);
     console.log("📂 Combined categoriesToUpdate:", categoriesToUpdate, "length:", categoriesToUpdate.length);
-    
+
     if (categoriesToUpdate.length > 0) {
       if (req.user?.role === 'admin') {
         console.log("📂 Admin updating categories:", categoriesToUpdate);
@@ -774,12 +889,12 @@ const update = async (req, res) => {
       const existingCategories = await TourCategory.findAll({
         where: { id: categoriesToUpdate }
       });
-      
+
       if (existingCategories.length !== categoriesToUpdate.length) {
         console.log('⚠️ Some categories not found:', categoriesToUpdate);
         console.log('✅ Existing categories:', existingCategories.map(c => c.id));
       }
-      
+
       await tour.setCategories(existingCategories.map(c => c.id));
       if (req.user?.role === 'admin') {
         console.log("✅ Categories updated by admin");
@@ -821,7 +936,7 @@ const update = async (req, res) => {
 
     // Xử lý multiple locations (update function)
     const locationsToProcess = [];
-    
+
     // Support cả single location (legacy) và multiple locations (new)
     if (location_id) {
       locationsToProcess.push(location_id);
@@ -829,33 +944,33 @@ const update = async (req, res) => {
     if (location_ids && location_ids.length > 0) {
       locationsToProcess.push(...location_ids);
     }
-    
+
     // Remove duplicates
     const uniqueLocationIds = [...new Set(locationsToProcess)];
-    
+
     if (uniqueLocationIds.length > 0) {
       if (req.user?.role === 'admin') {
         console.log("📍 Admin updating locations:", uniqueLocationIds);
       } else {
         console.log("📍 Agency updating locations:", uniqueLocationIds);
       }
-      
+
       // Kiểm tra locations có tồn tại không
       const existingLocations = await Location.findAll({
         where: { id: uniqueLocationIds }
       });
-      
+
       if (existingLocations.length > 0) {
         const locationIds = existingLocations.map(l => l.id);
         await tour.setLocations(locationIds);
-        
+
         // Auto-populate location field với tên của location đầu tiên (backward compatibility)
         if (existingLocations[0]) {
           await tour.update({ location: existingLocations[0].name });
           console.log("📍 Auto-populated location field with:", existingLocations[0].name);
         }
       }
-      
+
       if (req.user?.role === 'admin') {
         console.log("✅ Locations updated by admin");
       } else {
@@ -883,18 +998,18 @@ const update = async (req, res) => {
         { model: Location, as: 'locations' }
       ]
     });
-    
+
     if (req.user?.role === 'admin') {
       console.log("🎉 Admin tour update completed successfully:", {
         id: tour.id,
         name: tour.name,
-        updatedBy: req.user.email
+        updatedBy: req.user?.email || req.user?.id || 'unknown'
       });
     } else {
       console.log("🎉 Agency tour update completed successfully:", {
         id: tour.id,
         name: tour.name,
-        updatedBy: req.user.email
+        updatedBy: req.user?.email || req.user?.id || 'unknown'
       });
     }
 
@@ -930,20 +1045,20 @@ const updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, reason } = req.body;
-    
+
     // Validate status
     const validStatuses = ['Chờ duyệt', 'Đang hoạt động', 'Ngừng hoạt động', 'Đã hủy'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ 
-        message: "Trạng thái không hợp lệ", 
-        validStatuses 
+      return res.status(400).json({
+        message: "Trạng thái không hợp lệ",
+        validStatuses
       });
     }
 
     const tour = await Tour.findByPk(id, {
       include: [{ model: Agency, as: 'agency', include: [{ model: User, as: 'user' }] }]
     });
-    
+
     if (!tour) {
       return res.status(404).json({ message: "Không tìm thấy tour" });
     }
@@ -955,29 +1070,29 @@ const updateStatus = async (req, res) => {
       if (!userAgency || tour.agency_id !== userAgency.id) {
         return res.status(403).json({ message: "Không có quyền sửa tour này" });
       }
-      
+
       // Agency có giới hạn về status change
       const allowedChanges = {
         // Tour mới tạo hoặc chưa có status
         '': ['Chờ duyệt'],
-        null: ['Chờ duyệt'], 
+        null: ['Chờ duyệt'],
         undefined: ['Chờ duyệt'],
-        
+
         // Các trạng thái chuẩn
         'Chờ duyệt': ['Ngừng hoạt động'],
         'Đang hoạt động': ['Ngừng hoạt động'],
         'Ngừng hoạt động': ['Chờ duyệt'],
-        
+
         // Fallback cho bất kỳ trạng thái nào khác
         'default': ['Chờ duyệt']
       };
-      
+
       // Normalize current status
       const currentStatus = tour.status || '';
       const allowedStatusesForCurrent = allowedChanges[currentStatus] || allowedChanges['default'] || [];
-      
+
       if (!allowedStatusesForCurrent.includes(status)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: `Agency không thể chuyển từ '${currentStatus}' sang '${status}'`,
           currentStatus: currentStatus,
           allowedStatuses: allowedStatusesForCurrent,
@@ -995,8 +1110,8 @@ const updateStatus = async (req, res) => {
       const { sendEmail } = require("../config/mailer");
       let emailSubject = "";
       let emailContent = "";
-      
-      switch(status) {
+
+      switch (status) {
         case 'Đang hoạt động':
           emailSubject = "Tour đã được duyệt";
           emailContent = `<p>Tour <strong>${tour.name}</strong> đã được admin phê duyệt và đang hoạt động.</p>`;
@@ -1012,7 +1127,7 @@ const updateStatus = async (req, res) => {
                          ${reason ? `<p><strong>Lý do:</strong> ${reason}</p>` : ''}`;
           break;
       }
-      
+
       if (emailSubject) {
         try {
           await sendEmail(tour.agency.user.email, emailSubject, emailContent);
@@ -1023,7 +1138,7 @@ const updateStatus = async (req, res) => {
     }
 
     console.log(`✅ Tour ${id} status: ${oldStatus} → ${status} by ${req.user.role}`);
-    
+
     res.json({
       message: `Đã cập nhật trạng thái tour từ '${oldStatus}' sang '${status}'`,
       tour: {
@@ -1034,7 +1149,7 @@ const updateStatus = async (req, res) => {
         reason: reason || null
       }
     });
-    
+
   } catch (err) {
     console.error("Lỗi khi cập nhật trạng thái tour:", err);
     res.status(500).json({ message: "Lỗi server", error: err.message });
@@ -1311,18 +1426,18 @@ const getTourComplete = async (req, res) => {
             booked: 0
           };
         }
-   
+
         const [summary] = await sequelize.query(
           `SELECT total_booked FROM booking_summary WHERE LOWER(tour_id) = ? AND LOWER(departure_date_id) = ? LIMIT 1`,
           { replacements: [tourIdLower, departureDateId], type: sequelize.QueryTypes.SELECT }
         );
-      
+
         if (!summary) {
           console.warn(`[WARN][${idx}] Không tìm thấy booking_summary cho:`, { tourIdLower, departureDateId });
         }
         const booked = summary && summary.total_booked ? parseInt(summary.total_booked, 10) : 0;
         const available_slots = (tour.max_participants || 0) - booked;
-     
+
         return {
           ...dateObj,
           available_slots: available_slots < 0 ? 0 : available_slots,
@@ -1383,29 +1498,29 @@ const getToursByLocation = async (req, res) => {
     const { locationId } = req.params;
     const { Op } = require("sequelize");
     const { sequelize } = require("../config/db");
-    
+
     // Lấy thông tin location
     const { Location } = require("../models");
     const location = await Location.findByPk(locationId);
-    
+
     if (!location) {
       return res.status(404).json({ message: "Không tìm thấy location" });
     }
-    
+
     console.log(`Searching tours for location: ${location.name}`);
-    
+
     // Tìm tours có location hoặc destination trùng với location name
     const tours = await Tour.findAll({
       where: {
         [Op.or]: [
           sequelize.where(
-            sequelize.fn('LOWER', sequelize.col('location')), 
-            'LIKE', 
+            sequelize.fn('LOWER', sequelize.col('location')),
+            'LIKE',
             `%${location.name.toLowerCase()}%`
           ),
           sequelize.where(
-            sequelize.fn('LOWER', sequelize.col('destination')), 
-            'LIKE', 
+            sequelize.fn('LOWER', sequelize.col('destination')),
+            'LIKE',
             `%${location.name.toLowerCase()}%`
           )
         ]
@@ -1436,10 +1551,10 @@ const getToursByLocation = async (req, res) => {
         }
       ]
     });
-    
+
     console.log(`Found ${tours.length} tours for location ${location.name}`);
     res.json(tours);
-    
+
   } catch (err) {
     console.error("Lỗi khi lấy tours theo location:", err);
     res.status(500).json({ message: "Lỗi server", error: err.message });
@@ -1453,27 +1568,27 @@ const getToursByDestination = async (req, res) => {
     const { Op } = require("sequelize");
     const { sequelize } = require("../config/db");
     const { Destination } = require("../models");
-    
+
     // Tìm destination để lấy tên
     const destination = await Destination.findByPk(destinationId);
     if (!destination) {
       return res.status(404).json({ message: "Không tìm thấy destination" });
     }
-    
+
     console.log(`Searching tours for destination: ${destination.name}`);
-    
+
     // Tìm tours có location hoặc destination trùng với destination name
     const tours = await Tour.findAll({
       where: {
         [Op.or]: [
           sequelize.where(
-            sequelize.fn('LOWER', sequelize.col('location')), 
-            'LIKE', 
+            sequelize.fn('LOWER', sequelize.col('location')),
+            'LIKE',
             `%${destination.name.toLowerCase()}%`
           ),
           sequelize.where(
-            sequelize.fn('LOWER', sequelize.col('destination')), 
-            'LIKE', 
+            sequelize.fn('LOWER', sequelize.col('destination')),
+            'LIKE',
             `%${destination.name.toLowerCase()}%`
           )
         ]
@@ -1503,7 +1618,7 @@ const getToursByDestination = async (req, res) => {
         }
       ]
     });
-    
+
     console.log(`Found ${tours.length} tours for destination ${destination.name}`);
     res.json(tours);
   } catch (err) {
@@ -1519,16 +1634,16 @@ const getCompleteTour = getTourComplete;
 const debugTourData = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const tour = await Tour.findByPk(id, {
       attributes: ['id', 'name', 'location', 'destination', 'departure_location', 'status', 'created_at'],
       raw: true
     });
-    
+
     if (!tour) {
       return res.status(404).json({ message: "Tour không tồn tại" });
     }
-    
+
     res.json({
       message: "Debug tour data",
       tour,
@@ -1549,7 +1664,7 @@ const debugTourData = async (req, res) => {
 const debugTourRelations = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Get tour with all relations
     const tour = await Tour.findByPk(id, {
       include: [
@@ -1573,29 +1688,29 @@ const debugTourRelations = async (req, res) => {
         }
       ]
     });
-    
+
     if (!tour) {
       return res.status(404).json({ message: "Tour không tồn tại" });
     }
-    
+
     // Raw query để check junction tables
     const { sequelize } = require('../models');
-    
+
     const hotelJunction = await sequelize.query(
       'SELECT * FROM tour_hotel WHERE tour_id = ?',
       { replacements: [id], type: sequelize.QueryTypes.SELECT }
     );
-    
+
     const serviceJunction = await sequelize.query(
       'SELECT * FROM tour_included_service WHERE tour_id = ?',
       { replacements: [id], type: sequelize.QueryTypes.SELECT }
     );
-    
+
     const categoryJunction = await sequelize.query(
       'SELECT * FROM tour_tour_category WHERE tour_id = ?',
       { replacements: [id], type: sequelize.QueryTypes.SELECT }
     );
-    
+
     res.json({
       message: "Debug tour relations",
       tour: {
@@ -1616,7 +1731,7 @@ const debugTourRelations = async (req, res) => {
         categories: tour.categories ? tour.categories.length : 0
       }
     });
-    
+
   } catch (err) {
     console.error("Debug relations error:", err);
     res.status(500).json({ error: err.message });
@@ -1660,12 +1775,12 @@ const assignLocationToTour = async (req, res) => {
     }
 
     await tour.addLocation(location);
-    
+
     // Auto-update location field nếu chưa có
     if (!tour.location) {
       await tour.update({ location: location.name });
     }
-    
+
     res.json({ message: "Đã gắn location vào tour thành công" });
   } catch (err) {
     console.error("Lỗi khi gắn location vào tour:", err);
@@ -1717,5 +1832,6 @@ module.exports = {
   updateBookingSummary,
   getTourWithLocations,
   assignLocationToTour,
-  removeLocationFromTour
+  removeLocationFromTour,
+  submitForApproval,
 };

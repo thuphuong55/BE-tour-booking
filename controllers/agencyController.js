@@ -137,32 +137,24 @@ exports.adminCreateAgency = async (req, res) => {
 
     console.log(`✅ Admin created agency: ${agency.name} (${agency.id})`);
 
-    // Gửi email thông báo cho agency
+    // Gửi email thông báo cho agency với link đăng nhập
+    console.log(`📧 Preparing to send welcome email to agency: ${email}`);
     try {
-      await sendEmail(
-        user.email,
-        "🎉 Tài khoản Agency đã được tạo bởi Admin",
-        `
-        <h2>🎉 Chào mừng bạn đến với hệ thống!</h2>
-        <p>Tài khoản Agency <strong>${agency.name}</strong> đã được Admin tạo thành công.</p>
-        
-        <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3>📋 Thông tin đăng nhập:</h3>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Mật khẩu:</strong> ${password}</p>
-          <p><strong>Username:</strong> ${username}</p>
-        </div>
-        
-        <p><strong>Trạng thái:</strong> Đã duyệt và kích hoạt</p>
-        <p><strong>Quyền:</strong> Có thể tạo và quản lý tours ngay lập tức</p>
-        
-        <p>🔐 <em>Vui lòng đổi mật khẩu sau khi đăng nhập lần đầu để bảo mật.</em></p>
-        <p>📞 Liên hệ admin nếu cần hỗ trợ.</p>
-        `
-      );
-      console.log("📧 Welcome email sent to agency");
+      const { sendAgencyAccountCreatedEmail } = require('../services/emailNotificationService');
+      console.log(`📧 sendAgencyAccountCreatedEmail function imported successfully`);
+      
+      const emailResult = await sendAgencyAccountCreatedEmail({
+        email,
+        username,
+        tempPassword: password,
+        name: agencyName,
+        id: user.id
+      });
+      
+      console.log(`📧 Email sending result:`, emailResult);
     } catch (emailError) {
-      console.error("📧 Email sending failed:", emailError);
+      console.error("❌ Email sending failed in controller:", emailError);
+      console.error("❌ Email error stack:", emailError.stack);
       // Không fail request vì agency đã tạo thành công
     }
 
@@ -185,7 +177,7 @@ exports.adminCreateAgency = async (req, res) => {
           username,
           tempPassword: password
         },
-        createdBy: req.user.email,
+        createdBy: req.user ? req.user.email : 'SYSTEM_TEST',
         createdAt: new Date().toISOString()
       }
     });
@@ -298,7 +290,7 @@ exports.approveAgency = async (req, res) => {
       user.email,
       "Agency đã được phê duyệt",
       `<p>Chúc mừng! Agency <strong>${agency.name}</strong> đã được phê duyệt.</p>
-       <p><a href="${resetLink}">Nhấn vào đây để đặt mật khẩu đầu tiên</a></p>`
+       <p>Hãy đợi mail thông tin tài khoản trong ngày hôm nay.</p>`
     );
 
     return res.status(200).json({
@@ -313,7 +305,7 @@ exports.approveAgency = async (req, res) => {
 
 /* LẤY DANH SÁCH AGENCY (Admin) */
 
-exports.getAgencies = async (req, res) => {
+exports.getAllAgencies = async (req, res) => {
   try {
     // /api/agencies?page=1&limit=20&status=pending
     const page   = +req.query.page  || 1;
@@ -373,7 +365,63 @@ exports.toggleLockAgency = async (req, res) => {
     if (!agency) return res.status(404).json({ message: "Không tìm thấy agency" });
 
     const user = agency.user;
-    if (!user) return res.status(404).json({ message: "Không tìm thấy user của agency" });
+    if (!user) {
+      console.error(`❌ Orphan agency detected: ${agency.name} (${agency.id}) references non-existent user ${agency.user_id}`);
+      
+      // Tự động tạo user mới cho agency orphan
+      console.log(`🔧 Creating new user for orphan agency...`);
+      const crypto = require("crypto");
+      const bcrypt = require("bcryptjs");
+      
+      // Tạo username từ agency name
+      let baseUsername = agency.name.toLowerCase()
+        .replace(/[^a-z0-9]/g, '') // Remove special chars
+        .substring(0, 20); // Limit length
+        
+      let username = baseUsername;
+      let counter = 1;
+      
+      // Ensure unique username
+      while (await User.findOne({ where: { username } })) {
+        username = `${baseUsername}_${counter}`;
+        counter++;
+      }
+      
+      // Tạo password tạm thời
+      const tempPassword = crypto.randomBytes(8).toString("hex");
+      const hashedPassword = await bcrypt.hash(tempPassword, 12);
+      
+      const newUser = await User.create({
+        id: agency.user_id, // Sử dụng lại ID để maintain reference
+        name: agency.name,
+        username,
+        email: agency.email,
+        password_hash: hashedPassword,
+        role: "agency",
+        status: "active",
+        isVerified: true
+      });
+      
+      console.log(`✅ Created new user for agency: ${newUser.username} (${newUser.id})`);
+      
+      // Gán user mới cho agency object
+      agency.user = newUser;
+      
+      // Gửi email thông báo tài khoản mới
+      try {
+        const { sendAgencyAccountCreatedEmail } = require('../services/emailNotificationService');
+        await sendAgencyAccountCreatedEmail({
+          email: agency.email,
+          username,
+          tempPassword,
+          name: agency.name,
+          id: newUser.id
+        });
+        console.log(`📧 Sent account recovery email to ${agency.email}`);
+      } catch (emailError) {
+        console.error("❌ Failed to send recovery email:", emailError);
+      }
+    }
 
     let newStatus, newUserStatus, message;
     
@@ -391,7 +439,11 @@ exports.toggleLockAgency = async (req, res) => {
 
     // Cập nhật agency và user
     await agency.update({ status: newStatus });
-    await user.update({ status: newUserStatus });
+    await user.update({ 
+      status: newUserStatus,
+      // ✨ INVALIDATE TẤT CẢ TOKENS CŨ khi lock
+      token_invalidated_at: action === "lock" ? new Date() : null
+    });
 
     // Gửi email thông báo cho agency
     const { sendEmail } = require("../config/mailer");

@@ -4,6 +4,14 @@ const tourController = require("../controllers/tourController");
 const { protect } = require("../middlewares/auth");
 const ensureAgencyApproved = require("../middlewares/ensureAgencyApproved");
 
+// PATCH endpoint for agency to submit draft tour for approval
+router.patch(
+  "/:id/submit-for-approval",
+  protect(["agency"]),
+  ensureAgencyApproved,
+  tourController.submitForApproval
+);
+
 // Endpoint lấy tour theo location qua itinerary
 router.get("/location/:locationId", tourController.getToursByLocation);
 
@@ -12,7 +20,6 @@ router.get("/destination/:destinationId", tourController.getToursByDestination);
 
 // Thêm route test-log
 router.get("/test-log", (req, res) => {
-  console.log("Test route /test-log đã nhận request!");
   res.json({ message: "Test route OK" });
 });
 
@@ -40,7 +47,7 @@ router.get("/my-agency", protect(["agency"]), async (req, res) => {
       return res.status(403).json({ message: "Chỉ agency mới có thể truy cập endpoint này" });
     }
     
-    console.log("User from token:", req.user); // Debug log
+    // ...existing code...
     
     // Tìm agency_id từ user_id
     const agency = await Agency.findOne({
@@ -51,7 +58,7 @@ router.get("/my-agency", protect(["agency"]), async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy agency cho user này" });
     }
     
-    console.log("Found agency:", agency.id); // Debug log
+    // ...existing code...
     
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
@@ -112,7 +119,7 @@ router.get("/my-agency", protect(["agency"]), async (req, res) => {
     
     const totalPages = Math.ceil(count / limit);
     
-    console.log(`📊 Agency tours result: ${tours.length}/${count} tours, page ${page}/${totalPages}`);
+    // ...existing code...
     
     res.json({
       tours,
@@ -130,7 +137,6 @@ router.get("/my-agency", protect(["agency"]), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Error fetching agency tours:", error);
     res.status(500).json({ message: "Lỗi server", error: error.message });
   }
 });
@@ -160,7 +166,6 @@ router.get("/with-promotions", async (req, res) => {
     
     res.json(toursWithPromotions);
   } catch (error) {
-    console.error("Error fetching tours with promotions:", error);
     res.status(500).json({ error: "Lỗi khi lấy tours có promotion", details: error.message });
   }
 });

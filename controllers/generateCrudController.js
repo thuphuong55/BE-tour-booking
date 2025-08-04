@@ -66,6 +66,26 @@ module.exports = (Model, include = []) => {
         
         const row = await Model.create(dataToCreate);
         
+        // 📧 Gửi email thông báo khi tạo user có role agency
+        if (Model.name === 'User' && dataToCreate.role === 'agency') {
+          try {
+            console.log(`📧 Sending agency account created email for user: ${dataToCreate.email}`);
+            const { sendAgencyAccountCreatedEmail } = require('../services/emailNotificationService');
+            
+            await sendAgencyAccountCreatedEmail({
+              email: dataToCreate.email,
+              username: dataToCreate.username || dataToCreate.name,
+              tempPassword: req.body.password, // Sử dụng password gốc từ request
+              name: dataToCreate.name,
+              id: row.id
+            });
+            console.log(`✅ Agency account created email sent to: ${dataToCreate.email}`);
+          } catch (emailError) {
+            console.error(`❌ Failed to send agency email to ${dataToCreate.email}:`, emailError);
+            // Không fail request vì user đã tạo thành công
+          }
+        }
+        
         // Don't return password_hash in response
         if (Model.name === 'User') {
           const { password_hash, ...userResponse } = row.toJSON();

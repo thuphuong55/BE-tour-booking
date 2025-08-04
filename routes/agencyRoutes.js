@@ -18,10 +18,18 @@ router.get('/commissions', protect(['agency']), async (req, res) => {
   return getAgencyCommissions(req, res);
 });
 
-// Lấy agency theo user_id
+router.put('/approve/:id', protect(['admin']), agencyController.approveAgency);
+router.post('/public-request', agencyController.publicRequestAgency);
+router.get('/', protect(['admin']), agencyController.getAllAgencies);
 router.get('/by-user/:userId', agencyController.getAgencyByUserId);
+router.get('/:id', protect(['admin', 'agency']), agencyController.getAgency);
+
+// Admin management routes
+router.put('/toggle-lock/:id', protect(['admin']), agencyController.toggleLockAgency);
+router.delete('/:id', protect(['admin']), agencyController.deleteAgency);
 
 // 🧪 TEMPORARY: Test endpoint without auth (for debugging)
 router.post('/test-create', agencyController.adminCreateAgency);
+router.put('/test-toggle-lock/:id', agencyController.toggleLockAgency);
 
 module.exports = router;

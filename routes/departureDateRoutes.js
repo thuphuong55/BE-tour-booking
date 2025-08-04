@@ -15,10 +15,7 @@ router.use((req, res, next) => {
 });
 
 // CRUD mặc định với phân quyền
-router.get("/", (req, res, next) => {
-  console.log(`📍 [ROUTE] GET / handler called`);
-  next();
-}, controller.getAllDepartureDates);            // GET /api/departure-dates?tour_id=...
+// ...existing code...
 
 router.get("/:id", (req, res, next) => {
   console.log(`📍 [ROUTE] GET /:id handler called with id=${req.params.id}`);
@@ -67,7 +64,7 @@ router.post("/",
   },
   controller.create
 );           // POST /api/departure-dates
-router.put("/:id", protect, controller.update);         // PUT /api/departure-dates/:id
+router.put("/:id", protect(), controller.update);         // PUT /api/departure-dates/:id
 router.delete("/:id",
   (req, res, next) => {
     console.log(`📍 [ROUTE] DELETE /:id handler called with id=${req.params.id}`);
@@ -107,5 +104,8 @@ router.get("/by-tour/:tourId", async (req, res) => {
     res.status(500).json({ error: "Lỗi khi lấy theo tour_id", details: error.message });
   }
 });
+
+// Đặt route / ở cuối để tránh bị match nhầm với /:id
+router.get("/", protect(), controller.getAllDepartureDates);       // GET /api/departure-dates?tour_id=...
 
 module.exports = router;

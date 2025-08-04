@@ -48,7 +48,12 @@ module.exports = (sequelize, DataTypes) => {
     isVerified: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
-}
+},
+    token_invalidated_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null
+    }
 
   }, {
     timestamps: true, // ⚠️ Bật timestamps

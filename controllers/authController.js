@@ -56,9 +56,24 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
+    // Chỉ kiểm tra trạng thái với user thường và agency, không kiểm tra với admin
+    if ((user.role === 'user' || user.role === 'agency') && (user.status === 'locked' || user.status === 'inactive')) {
+      return res.status(403).json({ message: "Tài khoản đã bị khóa hoặc chưa kích hoạt. Vui lòng liên hệ admin." });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    let agencyId = null;
+    if (user.role === "agency") {
+      const Agency = require("../models").Agency;
+      const agency = await Agency.findOne({ where: { user_id: user.id } });
+      if (!agency || agency.status === 'locked' || agency.status === 'pending' || agency.status === 'rejected' || agency.status === 'deleted') {
+        return res.status(403).json({ message: "Tài khoản agency đã bị khóa hoặc chưa được duyệt. Vui lòng liên hệ admin." });
+      }
+      agencyId = agency.id;
     }
 
     const token = generateToken({
@@ -67,12 +82,6 @@ exports.login = async (req, res) => {
       role: user.role
     });
 
-
-    let agencyId = null;
-    if (user.role === "agency") {
-      const agency = await require("../models").Agency.findOne({ where: { user_id: user.id } });
-      if (agency) agencyId = agency.id;
-    }
     return res.json({
       message: "Login successful",
       user: {

@@ -11,13 +11,56 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Test kết nối SMTP khi khởi động
+const testSMTPConnection = async () => {
+  try {
+    console.log(`📧 Testing SMTP connection...`);
+    console.log(`📧 SMTP Config: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`);
+    console.log(`📧 Auth User: ${process.env.EMAIL_USER}`);
+    console.log(`📧 Auth Pass: ${process.env.EMAIL_PASS ? '***CONFIGURED***' : 'NOT_SET'}`);
+    
+    await transporter.verify();
+    console.log(`✅ SMTP connection test successful!`);
+  } catch (error) {
+    console.error(`❌ SMTP connection test failed:`, error);
+    console.error(`❌ SMTP Error details:`, {
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode
+    });
+  }
+};
+
+// Gọi test khi import module
+testSMTPConnection();
+
 const sendEmail = async (to, subject, html) => {
-  await transporter.sendMail({
-    from: `"${process.env.EMAIL_NAME}" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html
-  });
+  try {
+    console.log(`📧 Attempting to send email to: ${to}`);
+    console.log(`📧 Subject: ${subject}`);
+    console.log(`📧 From: "${process.env.EMAIL_NAME}" <${process.env.EMAIL_USER}>`);
+    console.log(`📧 SMTP Config: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`);
+    
+    const result = await transporter.sendMail({
+      from: `"${process.env.EMAIL_NAME}" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html
+    });
+    
+    console.log(`✅ Email sent successfully to ${to}:`, result.messageId);
+    return result;
+  } catch (error) {
+    console.error(`❌ Email sending failed to ${to}:`, error);
+    console.error(`❌ Error details:`, {
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode
+    });
+    throw error;
+  }
 };
 
 // 📧 Template email booking responsive cho smartphone

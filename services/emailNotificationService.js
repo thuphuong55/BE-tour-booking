@@ -1237,3 +1237,56 @@ module.exports = {
   sendManualRefundEmail,
   sendAgencyCancelTourEmail
 };
+
+/**
+ * Gửi email thông báo tài khoản agency vừa được admin tạo thành công
+ * @param {Object} params - Thông tin tài khoản
+ * @param {string} params.email - Email agency
+ * @param {string} params.username - Username
+ * @param {string} params.tempPassword - Mật khẩu tạm
+ * @param {string} params.name - Tên agency
+ * @param {string} params.id - ID user
+ */
+const sendAgencyAccountCreatedEmail = async ({ email, username, tempPassword, name, id }) => {
+  try {
+    console.log(`📧 Starting to send agency account created email to: ${email}`);
+    console.log(`📧 Agency details:`, { email, username, name, id });
+    
+    const loginUrl = 'http://localhost:3001/';
+    const emailHTML = `
+    <div style="font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;background:#f8fafc;padding:32px;max-width:600px;margin:auto;border-radius:16px;box-shadow:0 8px 32px rgba(102,126,234,0.08)">
+      <h2 style="color:#667eea">🎉 Tài khoản Agency đã được tạo thành công!</h2>
+      <p>Xin chào <strong>${name}</strong>,</p>
+      <p>Tài khoản agency của bạn đã được admin tạo thành công trên hệ thống.</p>
+      <div style="background:#fff;padding:20px;border-radius:10px;margin:24px 0;border:1px solid #e5e7eb">
+        <h3>📋 Thông tin đăng nhập:</h3>
+        <ul style="font-size:16px;line-height:1.7">
+          <li><strong>Email:</strong> ${email}</li>
+          <li><strong>Username:</strong> ${username}</li>
+          <li><strong>Mật khẩu tạm:</strong> ${tempPassword}</li>
+          <li><strong>ID:</strong> ${id}</li>
+        </ul>
+      </div>
+      <p><strong>Trạng thái:</strong> Đã duyệt và kích hoạt</p>
+      <p>Bạn có thể đăng nhập và quản lý tour tại:</p>
+      <a href="${loginUrl}" style="display:inline-block;padding:14px 32px;background:#667eea;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin:12px 0">Đăng nhập ngay</a>
+      <p style="margin-top:24px;font-size:15px;color:#374151">🔐 Vui lòng đổi mật khẩu sau khi đăng nhập lần đầu để bảo mật.<br>📞 Liên hệ admin nếu cần hỗ trợ.</p>
+    </div>
+  `;
+  
+    console.log(`📧 Calling sendEmail function...`);
+    await sendEmail(
+      email,
+      '🎉 Tài khoản Agency đã được tạo thành công',
+      emailHTML
+    );
+    console.log(`✅ Agency account created email sent successfully to: ${email}`);
+    return true;
+  } catch (err) {
+    console.error('❌ Error in sendAgencyAccountCreatedEmail:', err);
+    console.error('❌ Stack trace:', err.stack);
+    return false;
+  }
+};
+
+module.exports.sendAgencyAccountCreatedEmail = sendAgencyAccountCreatedEmail;

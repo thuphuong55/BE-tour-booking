@@ -22,6 +22,9 @@ router.get("/guest-id", (req, res) => {
   });
 });
 
+// 🧪 TEMPORARY: Test endpoint to create agency user without auth (for debugging)
+router.post("/test-create-agency", userController.create);
+
 // ───────────────────────────────────────────
 //  Protected Endpoints (Authentication required)
 // ───────────────────────────────────────────

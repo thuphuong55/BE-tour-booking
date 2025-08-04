@@ -3,7 +3,32 @@ const { Itinerary, Tour, Location, ItineraryLocation } = require("../models");
 // [GET] /api/itineraries
 exports.getAll = async (req, res) => {
   try {
+    console.log('[DEBUG-ITINERARY] User from req.user:', {
+      id: req.user?.id,
+      email: req.user?.email,
+      role: req.user?.role,
+      fullUser: req.user
+    });
+    
+    let whereClause = {};
+    // Nếu là agency, chỉ lấy itinerary của tour agency sở hữu
+    if (req.user && req.user.role === 'agency') {
+      const { Agency, Tour } = require("../models");
+      const agency = await Agency.findOne({ where: { user_id: req.user.id } });
+      console.log('[DEBUG-ITINERARY] Agency found for user_id', req.user.id, ':', agency?.id);
+      
+      if (agency) {
+        const tours = await Tour.findAll({ where: { agency_id: agency.id }, attributes: ['id'] });
+        whereClause.tour_id = tours.map(t => t.id);
+        console.log('[DEBUG-ITINERARY] Tours for agency:', whereClause.tour_id);
+      } else {
+        // Nếu không tìm thấy agency, trả về rỗng
+        console.log('[DEBUG-ITINERARY] No agency found for user_id:', req.user.id);
+        return res.status(200).json({ message: "Lấy danh sách hành trình thành công", data: [] });
+      }
+    }
     const itineraries = await Itinerary.findAll({
+      where: whereClause,
       include: [
         {
           model: Tour,
@@ -18,7 +43,6 @@ exports.getAll = async (req, res) => {
       ],
       order: [['day_number', 'ASC']]
     });
-
     res.status(200).json({
       message: "Lấy danh sách hành trình thành công",
       data: itineraries
@@ -39,7 +63,7 @@ exports.getById = async (req, res) => {
         {
           model: Tour,
           as: 'tour',
-          attributes: ['id', 'name']
+          attributes: ['id', 'name', 'agency_id']
         },
         {
           model: Location,
@@ -48,11 +72,17 @@ exports.getById = async (req, res) => {
         }
       ]
     });
-
     if (!itinerary) {
       return res.status(404).json({ message: "Không tìm thấy hành trình" });
     }
-
+    // Nếu là agency, chỉ trả về nếu tour thuộc agency đó
+    if (req.user && req.user.role === 'agency') {
+      const { Agency } = require("../models");
+      const agency = await Agency.findOne({ where: { user_id: req.user.id } });
+      if (!agency || itinerary.tour.agency_id !== agency.id) {
+        return res.status(403).json({ message: "Bạn không có quyền xem hành trình này" });
+      }
+    }
     res.status(200).json({
       message: "Lấy thông tin hành trình thành công",
       data: itinerary
@@ -68,6 +98,15 @@ exports.getByTourId = async (req, res) => {
   try {
     const { tourId } = req.params;
     
+    // Nếu là agency, chỉ trả về nếu tour thuộc agency đó
+    if (req.user && req.user.role === 'agency') {
+      const { Agency, Tour } = require("../models");
+      const agency = await Agency.findOne({ where: { user_id: req.user.id } });
+      const tour = await Tour.findByPk(tourId);
+      if (!agency || !tour || tour.agency_id !== agency.id) {
+        return res.status(403).json({ message: "Bạn không có quyền xem hành trình của tour này" });
+      }
+    }
     const itineraries = await Itinerary.findAll({
       where: { tour_id: tourId },
       include: [
@@ -79,7 +118,6 @@ exports.getByTourId = async (req, res) => {
       ],
       order: [['day_number', 'ASC']]
     });
-
     res.status(200).json({
       message: "Lấy hành trình theo tour thành công",
       data: itineraries

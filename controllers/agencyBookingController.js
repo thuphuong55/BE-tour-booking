@@ -1,3 +1,58 @@
+// GET /agency/bookings/top-tours - Top tours theo số lượng booking confirmed
+exports.getTopToursByBooking = async (req, res) => {
+  try {
+    const agencyId = await getAgencyId(req.user.id);
+    if (!agencyId) {
+      return res.status(403).json({ error: "Không tìm thấy agency" });
+    }
+
+    // Số lượng tour trả về (top N), mặc định 5
+    const limit = parseInt(req.query.limit) || 5;
+
+    // Lấy tất cả tour của agency
+    const tours = await Tour.findAll({
+      where: { agency_id: agencyId },
+      attributes: ['id', 'name', 'destination'],
+    });
+    const tourIds = tours.map(t => t.id);
+    if (tourIds.length === 0) {
+      return res.json([]);
+    }
+
+    // Đếm số lượng booking confirmed cho từng tour
+    const bookingCounts = await Booking.findAll({
+      where: {
+        tour_id: tourIds,
+        status: 'confirmed'
+      },
+      attributes: ['tour_id', [sequelize.fn('COUNT', sequelize.col('id')), 'confirmedCount']],
+      group: ['tour_id'],
+      raw: true
+    });
+
+    // Map tour info với số lượng booking
+    const topTours = tours.map(tour => {
+      const countObj = bookingCounts.find(b => b.tour_id === tour.id);
+      return {
+        id: tour.id,
+        name: tour.name,
+        destination: tour.destination,
+        confirmedBookings: countObj ? parseInt(countObj.confirmedCount) : 0
+      };
+    })
+    .sort((a, b) => b.confirmedBookings - a.confirmedBookings)
+    .slice(0, limit);
+
+    res.json({
+      topTours,
+      totalTours: tours.length,
+      limit
+    });
+  } catch (error) {
+    console.error("Error getting top tours by booking:", error);
+    res.status(500).json({ error: "Lỗi lấy thống kê tour nổi bật" });
+  }
+};
 const { Booking, Tour, Payment, User, DepartureDate, Promotion, sequelize, Agency, Review } = require("../models");
 const { Op } = require("sequelize");
 

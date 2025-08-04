@@ -36,6 +36,7 @@ app.use("/api/agencies", require("./routes/agencyRoutes"));
 app.use("/api/agency", require("./routes/agencyRoutes"));
 app.use("/api/auth", require("./routes/authRoutes"));  
 app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/debug", require("./routes/debugRoutes")); // Debug routes
 app.use("/api/tours", require("./routes/tourRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/guest", require("./routes/guestRoutes")); // Guest booking routes

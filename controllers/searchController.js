@@ -186,3 +186,172 @@ exports.getTopSearchDestinations = async (req, res) => {
     res.status(500).json({ message: "Lỗi server" });
   }
 };
+
+/**
+ * API gợi ý tìm kiếm (autocomplete/suggestions)
+ * GET /api/search/suggestions?q=da
+ */
+exports.getSearchSuggestions = async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.trim().length < 1) {
+      return res.json({ suggestions: [] });
+    }
+
+    const keyword = q.trim().toLowerCase();
+    console.log(`🔍 Getting search suggestions for: "${keyword}"`);
+
+    // Tìm kiếm trong các trường: name, location, destination của Tour
+    const tourSuggestions = await Tour.findAll({
+      where: {
+        [Op.and]: [
+          // Chỉ lấy tours đang hoạt động
+          {
+            [Op.or]: [
+              { status: 'Đang hoạt động' },
+              { status: '' },
+              { status: null }
+            ]
+          },
+          // Tìm kiếm theo từ khóa
+          {
+            [Op.or]: [
+              sequelize.where(
+                sequelize.fn('LOWER', sequelize.col('name')), 
+                'LIKE', 
+                `%${keyword}%`
+              ),
+              sequelize.where(
+                sequelize.fn('LOWER', sequelize.col('location')), 
+                'LIKE', 
+                `%${keyword}%`
+              ),
+              sequelize.where(
+                sequelize.fn('LOWER', sequelize.col('destination')), 
+                'LIKE', 
+                `%${keyword}%`
+              )
+            ]
+          }
+        ]
+      },
+      attributes: ['id', 'name', 'location', 'destination', 'price'],
+      include: [
+        {
+          model: TourImage,
+          as: 'images',
+          attributes: ['image_url'],
+          where: { is_main: true },
+          required: false,
+          limit: 1
+        }
+      ],
+      limit: 8,
+      order: [
+        // Ưu tiên tour có tên bắt đầu với từ khóa
+        [sequelize.fn('CASE', 
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), 'LIKE', `${keyword}%`), 1,
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('location')), 'LIKE', `${keyword}%`), 2,
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('destination')), 'LIKE', `${keyword}%`), 3,
+          4
+        ), 'ASC'],
+        ['name', 'ASC']
+      ]
+    });
+
+    // Tìm kiếm trong Location
+    const locationSuggestions = await Location.findAll({
+      where: {
+        [Op.or]: [
+          sequelize.where(
+            sequelize.fn('LOWER', sequelize.col('name')), 
+            'LIKE', 
+            `%${keyword}%`
+          ),
+          sequelize.where(
+            sequelize.fn('LOWER', sequelize.col('description')), 
+            'LIKE', 
+            `%${keyword}%`
+          )
+        ]
+      },
+      attributes: ['id', 'name', 'image_url', 'description'],
+      limit: 5,
+      order: [
+        [sequelize.fn('CASE', 
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), 'LIKE', `${keyword}%`), 1,
+          2
+        ), 'ASC'],
+        ['name', 'ASC']
+      ]
+    });
+
+    // Tìm kiếm trong Destination
+    const destinationSuggestions = await Destination.findAll({
+      where: {
+        [Op.or]: [
+          sequelize.where(
+            sequelize.fn('LOWER', sequelize.col('name')), 
+            'LIKE', 
+            `%${keyword}%`
+          )
+        ]
+      },
+      attributes: ['id', 'name', 'image'],
+      include: [
+        {
+          model: Location,
+          as: "location",
+          attributes: ["name"]
+        }
+      ],
+      limit: 5,
+      order: [
+        [sequelize.fn('CASE', 
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), 'LIKE', `${keyword}%`), 1,
+          2
+        ), 'ASC'],
+        ['name', 'ASC']
+      ]
+    });
+
+    // Format kết quả
+    const suggestions = {
+      tours: tourSuggestions.map(tour => ({
+        id: tour.id,
+        name: tour.name,
+        location: tour.location,
+        destination: tour.destination,
+        price: tour.price,
+        image: tour.images?.[0]?.image_url || null,
+        type: 'tour'
+      })),
+      locations: locationSuggestions.map(location => ({
+        id: location.id,
+        name: location.name,
+        image: location.image_url,
+        description: location.description,
+        type: 'location'
+      })),
+      destinations: destinationSuggestions.map(destination => ({
+        id: destination.id,
+        name: destination.name,
+        image: destination.image,
+        location: destination.location?.name,
+        type: 'destination'
+      }))
+    };
+
+    console.log(`✅ Found ${suggestions.tours.length} tours, ${suggestions.locations.length} locations, ${suggestions.destinations.length} destinations`);
+
+    res.json({ 
+      keyword: q,
+      suggestions 
+    });
+
+  } catch (err) {
+    console.error("❌ Lỗi lấy gợi ý tìm kiếm:", err);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};

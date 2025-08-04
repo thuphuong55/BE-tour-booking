@@ -3,7 +3,7 @@ require("dotenv").config();
 
 // Middleware bảo vệ - xác thực token và kiểm tra role
 const protect = (allowedRoles = []) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
       console.log('[PROTECT] Request to:', req.method, req.originalUrl);
       const authHeader = req.headers.authorization;
@@ -32,7 +32,53 @@ const protect = (allowedRoles = []) => {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = decoded;
-      console.log('[PROTECT] User decoded:', decoded.id, decoded.role);
+      console.log('[PROTECT] User decoded:', {
+        id: decoded.id,
+        email: decoded.email,
+        role: decoded.role,
+        fullDecoded: decoded
+      });
+      
+      // ✨ KIỂM TRA USER STATUS TRONG DATABASE
+      if (decoded.role === 'agency') {
+        const { User } = require('../models');
+        const userInDb = await User.findByPk(decoded.id);
+        
+        if (!userInDb || userInDb.status !== 'active') {
+          console.log('[PROTECT] Agency user inactive/locked:', {
+            userId: decoded.id,
+            userExists: !!userInDb,
+            userStatus: userInDb?.status
+          });
+          return res.status(403).json({
+            success: false,
+            error: "Forbidden",
+            message: "Tài khoản đã bị khóa hoặc vô hiệu hóa. Vui lòng đăng nhập lại.",
+            action: "FORCE_LOGOUT" // Signal frontend to logout
+          });
+        }
+        
+        // ✨ KIỂM TRA TOKEN INVALIDATION TIME (if exists)
+        if (userInDb.token_invalidated_at) {
+          const tokenIssuedAt = new Date(decoded.iat * 1000);
+          const invalidatedAt = new Date(userInDb.token_invalidated_at);
+          
+          if (tokenIssuedAt < invalidatedAt) {
+            console.log('[PROTECT] Token invalidated:', {
+              tokenIssued: tokenIssuedAt,
+              invalidatedAt: invalidatedAt
+            });
+            return res.status(403).json({
+              success: false,
+              error: "Forbidden", 
+              message: "Token đã bị vô hiệu hóa. Vui lòng đăng nhập lại.",
+              action: "FORCE_LOGOUT"
+            });
+          }
+        }
+        
+        console.log('[PROTECT] Agency user status verified: active');
+      }
       
       // Kiểm tra role nếu có yêu cầu
       if (allowedRoles.length > 0 && !allowedRoles.includes(decoded.role)) {
